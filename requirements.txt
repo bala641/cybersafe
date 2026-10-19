@@ -1,33 +1,40 @@
-# Core packet capture and network analysis
+# ============================================================================
+# CyberSafe Network Monitor - Complete Dependencies
+# ============================================================================
+
+# Core Network Analysis
 scapy==2.5.0
 psutil==5.9.6
 
-# Web framework and real-time communication
+# Web Framework & Real-time Communication
 flask==3.0.0
 flask-socketio==5.3.5
 flask-cors==4.0.0
 python-socketio==5.10.0
 
-# Database and storage
+# Database & Storage
 sqlalchemy==2.0.23
 
-# Threat detection and analysis
+# Threat Detection & Analysis
 pytz==2023.3
 python-dateutil==2.8.2
 geoip2==4.7.0
 
-# GUI (Desktop)
+# Desktop GUI & Graphics
 customtkinter==5.2.1
 pillow==10.1.0
+matplotlib==3.8.0
+numpy==1.24.3
 
-# Utilities
+# Report Generation & Export
+reportlab==4.0.9
+python-docx==0.8.11
+
+# Utilities & Helpers
 colorama==0.4.6
 pyyaml==6.0.1
 requests==2.31.0
 
-# Graphing and visualization
-matplotlib==3.8.0
-
-# Report generation
-reportlab==4.0.9
-python-docx==0.8.11
+# ============================================================================
+# Installation: pip install -r requirements.txt
+# ============================================================================

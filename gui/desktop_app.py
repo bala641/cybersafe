@@ -1,40 +1,67 @@
 """
 CyberSafe Desktop GUI Application
-Modern desktop interface using CustomTkinter
+Professional Stock Market Style Live Dashboard
 """
 
 import customtkinter as ctk
-from tkinter import messagebox, scrolledtext
+from tkinter import messagebox, filedialog, scrolledtext
 import threading
 import sys
 import os
 from datetime import datetime
 from pathlib import Path
+import json
+import random
+from collections import deque
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.packet_capture import PacketCapture
-from core.threat_detector import ThreatDetector
-from core.port_monitor import PortMonitor
-from core.protocol_analyzer import ProtocolAnalyzer
-from utils.logger import Logger
+try:
+    from core.packet_capture import PacketCapture
+    from core.threat_detector import ThreatDetector
+    from core.port_monitor import PortMonitor
+    from core.protocol_analyzer import ProtocolAnalyzer
+    from utils.logger import Logger
+except:
+    pass
+
+
+class LiveGraph:
+    """Live updating graph for stock market style display"""
+    def __init__(self, max_points=60):
+        self.max_points = max_points
+        self.data = deque(maxlen=max_points)
+        self.timestamps = deque(maxlen=max_points)
+        self.lock = threading.Lock()
+    
+    def add_point(self, value):
+        with self.lock:
+            self.data.append(value)
+            self.timestamps.append(len(self.timestamps))
+    
+    def get_data(self):
+        with self.lock:
+            return list(self.data), list(self.timestamps)
 
 
 class CyberSafeGUI:
-    """
-    Main GUI application for CyberSafe Network Monitor
-    """
+    """Professional CyberSafe Dashboard with Live Graphs"""
     
     def __init__(self, config: dict = None):
         self.config = config or {}
         
-        # Initialize components
-        self.capture = None
-        self.threat_detector = None
-        self.port_monitor = None
-        self.protocol_analyzer = None
-        self.logger = None
+        # Initialize live graph data
+        self.packet_graph = LiveGraph()
+        self.threat_graph = LiveGraph()
+        self.bandwidth_graph = LiveGraph()
+        
+        # Current stats
+        self.total_packets = 0
+        self.total_threats = 0
+        self.active_connections = 0
+        self.bandwidth_usage = 0.0
+        self.total_bytes = 0
         
         self.monitoring_active = False
         self.update_thread = None
@@ -44,578 +71,779 @@ class CyberSafeGUI:
         ctk.set_default_color_theme("blue")
         
         self.root = ctk.CTk()
-        self.root.title("CyberSafe Network Monitor")
-        self.root.geometry("1400x900")
+        self.root.title("CyberSafe Network Monitor - Live Dashboard")
+        self.root.geometry("1800x1100")
         
-        # Set window icon if logo exists
+        # Set window icon
         try:
-            logo_path = Path(__file__).parent.parent / "assets" / "cybersafe_logo.ico"
-            if logo_path.exists():
-                self.root.iconbitmap(str(logo_path))
-        except Exception as e:
-            pass  # Logo not critical, app still works
+            icon_path = "./assets/cybersafe_logo.ico"
+            if os.path.exists(icon_path):
+                self.root.iconbitmap(icon_path)
+        except:
+            pass
         
         self._create_ui()
-        self._initialize_components()
-    
-    def _initialize_components(self):
-        """Initialize monitoring components"""
-        interface = self.config.get('network', {}).get('interface')
-        self.capture = PacketCapture(interface=interface)
-        self.threat_detector = ThreatDetector(self.config.get('threats', {}))
-        self.port_monitor = PortMonitor()
-        self.protocol_analyzer = ProtocolAnalyzer()
-        self.logger = Logger()
-        
-        # Register packet callback
-        self.capture.register_callback(self._process_packet)
-        
-        # Update interface dropdown
-        self._update_interfaces()
+        self._start_live_updates()
     
     def _create_ui(self):
-        """Create user interface"""
-        # Top control panel
-        self._create_control_panel()
-        
-        # Main content area with tabs
-        self.tab_view = ctk.CTkTabview(self.root)
-        self.tab_view.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # Create tabs
-        self.tab_view.add("Dashboard")
-        self.tab_view.add("Packets")
-        self.tab_view.add("Threats")
-        self.tab_view.add("Ports")
-        self.tab_view.add("Statistics")
-        
-        self._create_dashboard_tab()
-        self._create_packets_tab()
-        self._create_threats_tab()
-        self._create_ports_tab()
-        self._create_statistics_tab()
-        
-        # Status bar
-        self._create_status_bar()
-    
-    def _create_control_panel(self):
-        """Create top control panel"""
-        control_frame = ctk.CTkFrame(self.root)
-        control_frame.pack(fill="x", padx=10, pady=10)
-        
-        # Interface selection
-        ctk.CTkLabel(control_frame, text="Interface:").pack(side="left", padx=5)
-        self.interface_var = ctk.StringVar(value="auto")
-        self.interface_dropdown = ctk.CTkComboBox(
-            control_frame,
-            variable=self.interface_var,
-            values=["auto"],
-            width=200
-        )
-        self.interface_dropdown.pack(side="left", padx=5)
-        
-        # Filter
-        ctk.CTkLabel(control_frame, text="Filter:").pack(side="left", padx=5)
-        self.filter_entry = ctk.CTkEntry(control_frame, width=200, placeholder_text="BPF filter (optional)")
-        self.filter_entry.pack(side="left", padx=5)
-        
-        # Start/Stop button
-        self.start_button = ctk.CTkButton(
-            control_frame,
-            text="Start Capture",
-            command=self._toggle_capture,
-            fg_color="green",
-            width=150
-        )
-        self.start_button.pack(side="left", padx=10)
-        
-        # Threat detection toggle
-        self.threat_detection_var = ctk.BooleanVar(value=True)
-        self.threat_checkbox = ctk.CTkCheckBox(
-            control_frame,
-            text="Threat Detection",
-            variable=self.threat_detection_var
-        )
-        self.threat_checkbox.pack(side="left", padx=5)
-        
-        # Clear button
-        ctk.CTkButton(
-            control_frame,
-            text="Clear Data",
-            command=self._clear_data,
-            width=100
-        ).pack(side="left", padx=5)
-    
-    def _create_dashboard_tab(self):
-        """Create dashboard tab with overview"""
-        dashboard = self.tab_view.tab("Dashboard")
-        
-        # Stats frame
-        stats_frame = ctk.CTkFrame(dashboard)
-        stats_frame.pack(fill="x", padx=10, pady=10)
-        
-        # Create stat boxes
-        self.stat_boxes = {}
-        stats = [
-            ("Total Packets", "total_packets", "0"),
-            ("Threats", "threats", "0"),
-            ("Active Ports", "active_ports", "0"),
-            ("Data Rate", "data_rate", "0 KB/s")
-        ]
-        
-        for i, (label, key, default) in enumerate(stats):
-            box = ctk.CTkFrame(stats_frame)
-            box.grid(row=0, column=i, padx=10, pady=10, sticky="ew")
-            stats_frame.grid_columnconfigure(i, weight=1)
-            
-            ctk.CTkLabel(box, text=label, font=("Arial", 12)).pack(pady=5)
-            value_label = ctk.CTkLabel(box, text=default, font=("Arial", 24, "bold"))
-            value_label.pack(pady=5)
-            self.stat_boxes[key] = value_label
-        
-        # Recent activity
-        activity_frame = ctk.CTkFrame(dashboard)
-        activity_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        ctk.CTkLabel(activity_frame, text="Recent Activity", font=("Arial", 16, "bold")).pack(pady=10)
-        
-        self.activity_text = ctk.CTkTextbox(activity_frame, height=400)
-        self.activity_text.pack(fill="both", expand=True, padx=10, pady=10)
-    
-    def _create_packets_tab(self):
-        """Create packets view tab"""
-        packets = self.tab_view.tab("Packets")
-        
-        # Packet list
-        list_frame = ctk.CTkFrame(packets)
-        list_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        ctk.CTkLabel(list_frame, text="Captured Packets", font=("Arial", 16, "bold")).pack(pady=10)
-        
-        self.packets_text = ctk.CTkTextbox(list_frame, font=("Courier", 10))
-        self.packets_text.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # Add header
-        header = f"{'#':>6} {'Time':>10} {'Protocol':>8} {'Source':>20} {'Destination':>20} {'Length':>8}\n"
-        header += "=" * 100 + "\n"
-        self.packets_text.insert("1.0", header)
-    
-    def _create_threats_tab(self):
-        """Create threats view tab"""
-        threats = self.tab_view.tab("Threats")
-        
-        # Threat list
-        list_frame = ctk.CTkFrame(threats)
-        list_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        ctk.CTkLabel(list_frame, text="Detected Threats", font=("Arial", 16, "bold")).pack(pady=10)
-        
-        self.threats_text = ctk.CTkTextbox(list_frame, font=("Courier", 10))
-        self.threats_text.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        # Add header
-        header = f"{'Time':>10} {'Severity':>10} {'Type':>20} {'Description'}\n"
-        header += "=" * 100 + "\n"
-        self.threats_text.insert("1.0", header)
-    
-    def _create_ports_tab(self):
-        """Create ports view tab"""
-        ports = self.tab_view.tab("Ports")
-        
-        # Port list
-        list_frame = ctk.CTkFrame(ports)
-        list_frame.pack(fill="both", expand=True, padx=10, pady=10)
-        
-        ctk.CTkLabel(list_frame, text="Active Ports & Connections", font=("Arial", 16, "bold")).pack(pady=10)
-        
-        # Refresh button
-        ctk.CTkButton(
-            list_frame,
-            text="Refresh Ports",
-            command=self._refresh_ports
-        ).pack(pady=5)
-        
-        self.ports_text = ctk.CTkTextbox(list_frame, font=("Courier", 10))
-        self.ports_text.pack(fill="both", expand=True, padx=10, pady=10)
-    
-    def _create_statistics_tab(self):
-        """Create statistics tab with live graphs"""
-        stats = self.tab_view.tab("Statistics")
-        
+        """Create professional dashboard UI"""
         # Main container
-        main_frame = ctk.CTkFrame(stats)
-        main_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        main_container = ctk.CTkFrame(self.root, fg_color="#0a0e27")
+        main_container.pack(fill="both", expand=True)
         
-        # Title
-        title_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        title_frame.pack(fill="x", pady=(0, 10))
+        # Header
+        self._create_header(main_container)
         
-        ctk.CTkLabel(title_frame, text="📊 Network Statistics Dashboard", font=("Arial", 16, "bold"), text_color="#00d4ff").pack(side="left")
+        # Main dashboard area
+        content_frame = ctk.CTkFrame(main_container, fg_color="#0a0e27")
+        content_frame.pack(fill="both", expand=True, padx=15, pady=15)
         
-        ctk.CTkButton(
-            title_frame,
-            text="🖨️ Print Report",
-            command=self._print_statistics,
-            fg_color="#ff6b6b",
-            hover_color="#ff5252"
-        ).pack(side="right", padx=5)
+        # Left sidebar - Quick stats
+        self._create_left_sidebar(content_frame)
         
-        ctk.CTkButton(
-            title_frame,
-            text="📁 Export Report",
-            command=self._export_statistics_report,
-            fg_color="#4ecdc4"
-        ).pack(side="right", padx=5)
+        # Center area - Live graphs
+        center_frame = ctk.CTkFrame(content_frame, fg_color="#0a0e27")
+        center_frame.grid(row=0, column=1, sticky="nsew", padx=10)
         
-        # Live graphs section
-        graph_frame = ctk.CTkFrame(main_frame, fg_color="#0a0a0a", corner_radius=10)
-        graph_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        # Top row - 2 graphs
+        top_row = ctk.CTkFrame(center_frame, fg_color="#0a0e27")
+        top_row.pack(fill="both", expand=True, pady=(0, 10))
         
-        # Create matplotlib figure
-        import matplotlib.pyplot as plt
-        from matplotlib.backends.backend_tkagg import FigureCanvasTkAgg
-        from matplotlib.figure import Figure
-        import numpy as np
+        self._create_packets_graph(top_row)
+        self._create_threats_graph(top_row)
         
-        fig = Figure(figsize=(12, 6), dpi=100, facecolor='#0a0a0a')
-        ax = fig.add_subplot(111)
-        ax.set_facecolor('#1a1a1a')
+        # Bottom - 1 large graph
+        self._create_bandwidth_graph(center_frame)
         
-        # Sample data for graphs
-        x = np.arange(0, 60, 1)
-        packets = np.random.randint(100, 500, 60)
-        threats = np.random.randint(0, 10, 60)
-        connections = np.random.randint(10, 50, 60)
-        bandwidth = np.random.uniform(0.5, 3.0, 60)
+        # Right sidebar - Tabs
+        self._create_right_sidebar(content_frame)
         
-        # Plot data
-        ax2 = ax.twinx()
-        line1 = ax.plot(x, packets, color='#00d4ff', linewidth=2.5, label='Packets', marker='o', markersize=3)
-        ax.fill_between(x, packets, alpha=0.2, color='#00d4ff')
-        
-        line2 = ax.plot(x, threats * 50, color='#ff4444', linewidth=2.5, label='Threats (×50)', marker='s', markersize=3)
-        ax.fill_between(x, threats * 50, alpha=0.2, color='#ff4444')
-        
-        line3 = ax2.plot(x, bandwidth * 100, color='#ffaa00', linewidth=2.5, label='Bandwidth (×100)', marker='^', markersize=3)
-        ax2.fill_between(x, bandwidth * 100, alpha=0.2, color='#ffaa00')
-        
-        # Styling
-        ax.set_xlabel('Time (seconds)', color='#888888', fontsize=10)
-        ax.set_ylabel('Count', color='#888888', fontsize=10)
-        ax2.set_ylabel('Bandwidth (Mbps)', color='#888888', fontsize=10)
-        ax.grid(True, alpha=0.2, color='#444444')
-        ax.set_facecolor('#1a1a1a')
-        fig.patch.set_facecolor('#0a0a0a')
-        
-        # Legend
-        lines = line1 + line2 + line3
-        labels = [l.get_label() for l in lines]
-        ax.legend(lines, labels, loc='upper left', facecolor='#1a1a1a', edgecolor='#888888', labelcolor='#ffffff')
-        
-        # Tick colors
-        ax.tick_params(colors='#888888')
-        ax2.tick_params(colors='#888888')
-        
-        # Embed in tkinter
-        canvas = FigureCanvasTkAgg(fig, master=graph_frame)
-        canvas.draw()
-        canvas.get_tk_widget().pack(fill="both", expand=True)
-        
-        # Statistics summary
-        summary_frame = ctk.CTkFrame(main_frame, fg_color="transparent")
-        summary_frame.pack(fill="x", padx=10, pady=10)
-        
-        # Stats cards
-        self._create_stat_card(summary_frame, "Total Packets", "1,234", "#00d4ff", 0)
-        self._create_stat_card(summary_frame, "Threats Detected", "3", "#ff4444", 1)
-        self._create_stat_card(summary_frame, "Active Connections", "24", "#44ff44", 2)
-        self._create_stat_card(summary_frame, "Bandwidth", "2.35 MB/s", "#ffaa00", 3)
+        # Configure grid
+        content_frame.columnconfigure(0, weight=0)  # Left sidebar
+        content_frame.columnconfigure(1, weight=1)  # Center graphs
+        content_frame.columnconfigure(2, weight=0)  # Right sidebar
+        content_frame.rowconfigure(0, weight=1)
     
-    def _create_stat_card(self, parent, title, value, color, column):
-        """Create a statistics card"""
-        card = ctk.CTkFrame(parent, fg_color="#1a1a1a", corner_radius=10, border_width=2, border_color=color)
-        card.grid(row=0, column=column, padx=5, pady=5, sticky="ew")
-        parent.grid_columnconfigure(column, weight=1)
+    def _create_header(self, parent):
+        """Create professional header"""
+        header = ctk.CTkFrame(parent, fg_color="#1a2744", height=80)
+        header.pack(fill="x", padx=0, pady=0)
+        header.pack_propagate(False)
         
-        ctk.CTkLabel(card, text=title, font=("Arial", 10), text_color="#888888").pack(pady=(8, 2))
-        ctk.CTkLabel(card, text=value, font=("Arial", 14, "bold"), text_color=color).pack(pady=(2, 8))
-    
-    def _create_status_bar(self):
-        """Create bottom status bar"""
-        status_frame = ctk.CTkFrame(self.root)
-        status_frame.pack(fill="x", side="bottom", padx=10, pady=5)
+        # Left - Title
+        left_frame = ctk.CTkFrame(header, fg_color="transparent")
+        left_frame.pack(side="left", padx=20, pady=15)
+        
+        ctk.CTkLabel(
+            left_frame,
+            text="🔍 CyberSafe Network Monitor",
+            font=("Arial", 20, "bold"),
+            text_color="#00d4ff"
+        ).pack(anchor="w")
+        
+        ctk.CTkLabel(
+            left_frame,
+            text="Live Network Analytics Dashboard",
+            font=("Arial", 11),
+            text_color="#888888"
+        ).pack(anchor="w")
+        
+        # Center - Status
+        center_frame = ctk.CTkFrame(header, fg_color="transparent")
+        center_frame.pack(side="left", expand=True, padx=20)
         
         self.status_label = ctk.CTkLabel(
-            status_frame,
-            text="Ready",
-            font=("Arial", 10)
+            center_frame,
+            text="🟢 Ready",
+            font=("Arial", 12, "bold"),
+            text_color="#4ecdc4"
         )
-        self.status_label.pack(side="left", padx=10)
+        self.status_label.pack()
         
-        self.connection_label = ctk.CTkLabel(
-            status_frame,
-            text="⚫ Not Monitoring",
-            font=("Arial", 10)
+        # Right - Controls
+        right_frame = ctk.CTkFrame(header, fg_color="transparent")
+        right_frame.pack(side="right", padx=20, pady=15)
+        
+        self.start_btn = ctk.CTkButton(
+            right_frame,
+            text="▶ Start Monitoring",
+            command=self._toggle_monitoring,
+            fg_color="#00d4ff",
+            hover_color="#00a8cc",
+            width=150,
+            height=35
         )
-        self.connection_label.pack(side="right", padx=10)
+        self.start_btn.pack(side="left", padx=5)
+        
+        ctk.CTkButton(
+            right_frame,
+            text="💾 Export",
+            command=self._export_with_dialog,
+            fg_color="#4ecdc4",
+            hover_color="#3ab5b5",
+            width=120,
+            height=35
+        ).pack(side="left", padx=5)
+        
+        ctk.CTkButton(
+            right_frame,
+            text="🖨️ Print",
+            command=self._print_report,
+            fg_color="#ff6b6b",
+            hover_color="#ff5252",
+            width=120,
+            height=35
+        ).pack(side="left", padx=5)
     
-    def _update_interfaces(self):
-        """Update interface dropdown with available interfaces"""
-        try:
-            interfaces = PacketCapture.get_available_interfaces()
-            interface_names = ["auto"] + list(interfaces.keys())
-            self.interface_dropdown.configure(values=interface_names)
-        except Exception as e:
-            self._log_activity(f"Error loading interfaces: {e}")
+    def _create_left_sidebar(self, parent):
+        """Create left sidebar with quick stats"""
+        sidebar = ctk.CTkFrame(parent, fg_color="#1a2744", width=220)
+        sidebar.grid(row=0, column=0, sticky="ns", padx=(0, 10))
+        sidebar.pack_propagate(False)
+        
+        # Title
+        ctk.CTkLabel(
+            sidebar,
+            text="📊 Live Stats",
+            font=("Arial", 13, "bold"),
+            text_color="#00d4ff"
+        ).pack(pady=(15, 20), padx=15)
+        
+        # Stat cards
+        self._create_stat_card(
+            sidebar, "Total Packets", "0", "#00d4ff",
+            "Packets captured"
+        )
+        
+        self._create_stat_card(
+            sidebar, "Threats", "0", "#ff6b6b",
+            "Detected"
+        )
+        
+        self._create_stat_card(
+            sidebar, "Connections", "0", "#4ecdc4",
+            "Active TCP/UDP"
+        )
+        
+        self._create_stat_card(
+            sidebar, "Bandwidth", "0 MB/s", "#ffd93d",
+            "Current usage"
+        )
+        
+        self._create_stat_card(
+            sidebar, "Protocols", "0", "#95e1d3",
+            "Unique types"
+        )
+        
+        self._create_stat_card(
+            sidebar, "Data", "0 MB", "#c7b3e5",
+            "Total transferred"
+        )
     
-    def _toggle_capture(self):
-        """Start or stop packet capture"""
+    def _create_stat_card(self, parent, title, value, color, subtitle):
+        """Create individual stat card"""
+        card = ctk.CTkFrame(parent, fg_color="#0f1929", border_width=2, border_color=color)
+        card.pack(fill="x", padx=15, pady=8)
+        
+        # Title
+        ctk.CTkLabel(
+            card,
+            text=title,
+            font=("Arial", 9),
+            text_color="#888888"
+        ).pack(anchor="w", padx=12, pady=(8, 0))
+        
+        # Value
+        value_label = ctk.CTkLabel(
+            card,
+            text=value,
+            font=("Arial", 18, "bold"),
+            text_color=color
+        )
+        value_label.pack(anchor="w", padx=12)
+        
+        # Subtitle
+        ctk.CTkLabel(
+            card,
+            text=subtitle,
+            font=("Arial", 8),
+            text_color="#666666"
+        ).pack(anchor="w", padx=12, pady=(0, 8))
+        
+        return value_label
+    
+    def _create_packets_graph(self, parent):
+        """Create live packets graph"""
+        frame = ctk.CTkFrame(parent, fg_color="#1a2744", border_width=2, border_color="#00d4ff")
+        frame.pack(side="left", fill="both", expand=True, padx=(0, 5))
+        
+        # Title
+        header = ctk.CTkFrame(frame, fg_color="transparent")
+        header.pack(fill="x", padx=15, pady=(15, 10))
+        
+        ctk.CTkLabel(
+            header,
+            text="📈 Packets Per Second",
+            font=("Arial", 12, "bold"),
+            text_color="#00d4ff"
+        ).pack(anchor="w")
+        
+        # Graph area
+        self.packets_canvas = ctk.CTkCanvas(
+            frame,
+            bg="#0f1929",
+            highlightthickness=0,
+            height=250
+        )
+        self.packets_canvas.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+        self.packets_canvas.bind("<Configure>", lambda e: self._draw_packets_graph())
+    
+    def _create_threats_graph(self, parent):
+        """Create live threats graph"""
+        frame = ctk.CTkFrame(parent, fg_color="#1a2744", border_width=2, border_color="#ff6b6b")
+        frame.pack(side="left", fill="both", expand=True, padx=(5, 0))
+        
+        # Title
+        header = ctk.CTkFrame(frame, fg_color="transparent")
+        header.pack(fill="x", padx=15, pady=(15, 10))
+        
+        ctk.CTkLabel(
+            header,
+            text="⚠️ Threats Per Minute",
+            font=("Arial", 12, "bold"),
+            text_color="#ff6b6b"
+        ).pack(anchor="w")
+        
+        # Graph area
+        self.threats_canvas = ctk.CTkCanvas(
+            frame,
+            bg="#0f1929",
+            highlightthickness=0,
+            height=250
+        )
+        self.threats_canvas.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+        self.threats_canvas.bind("<Configure>", lambda e: self._draw_threats_graph())
+    
+    def _create_bandwidth_graph(self, parent):
+        """Create live bandwidth graph"""
+        frame = ctk.CTkFrame(parent, fg_color="#1a2744", border_width=2, border_color="#ffd93d")
+        frame.pack(fill="both", expand=True, padx=0, pady=(10, 0))
+        
+        # Title
+        header = ctk.CTkFrame(frame, fg_color="transparent")
+        header.pack(fill="x", padx=15, pady=(15, 10))
+        
+        ctk.CTkLabel(
+            header,
+            text="📊 Bandwidth Usage (MB/s)",
+            font=("Arial", 12, "bold"),
+            text_color="#ffd93d"
+        ).pack(anchor="w")
+        
+        # Graph area
+        self.bandwidth_canvas = ctk.CTkCanvas(
+            frame,
+            bg="#0f1929",
+            highlightthickness=0,
+            height=180
+        )
+        self.bandwidth_canvas.pack(fill="both", expand=True, padx=15, pady=(0, 15))
+        self.bandwidth_canvas.bind("<Configure>", lambda e: self._draw_bandwidth_graph())
+    
+    def _create_right_sidebar(self, parent):
+        """Create right sidebar with tabs"""
+        sidebar = ctk.CTkFrame(parent, fg_color="#1a2744", width=250)
+        sidebar.grid(row=0, column=2, sticky="ns", padx=(10, 0))
+        sidebar.pack_propagate(False)
+        
+        # Tabs
+        tabs = ctk.CTkTabview(sidebar)
+        tabs.pack(fill="both", expand=True, padx=10, pady=10)
+        
+        # Packets tab
+        packets_tab = tabs.add("Packets")
+        self.packets_text = scrolledtext.ScrolledText(
+            packets_tab,
+            bg="#0f1929",
+            fg="#00d4ff",
+            font=("Courier", 8),
+            height=30
+        )
+        self.packets_text.pack(fill="both", expand=True)
+        self.packets_text.insert("end", "Waiting for packets...\n")
+        
+        # Threats tab
+        threats_tab = tabs.add("Threats")
+        self.threats_text = scrolledtext.ScrolledText(
+            threats_tab,
+            bg="#0f1929",
+            fg="#ff6b6b",
+            font=("Courier", 8),
+            height=30
+        )
+        self.threats_text.pack(fill="both", expand=True)
+        self.threats_text.insert("end", "No threats detected.\n")
+        
+        # Connections tab
+        conn_tab = tabs.add("Connections")
+        self.connections_text = scrolledtext.ScrolledText(
+            conn_tab,
+            bg="#0f1929",
+            fg="#4ecdc4",
+            font=("Courier", 8),
+            height=30
+        )
+        self.connections_text.pack(fill="both", expand=True)
+        self.connections_text.insert("end", "Monitoring connections...\n")
+    
+    def _draw_packets_graph(self):
+        """Draw live packets graph"""
+        canvas = self.packets_canvas
+        canvas.delete("all")
+        
+        width = canvas.winfo_width()
+        height = canvas.winfo_height()
+        
+        if width <= 1:
+            return
+        
+        data, times = self.packet_graph.get_data()
+        
+        if not data:
+            return
+        
+        # Background
+        canvas.create_rectangle(0, 0, width, height, fill="#0f1929", outline="none")
+        
+        # Draw grid
+        for i in range(0, width, 50):
+            canvas.create_line(i, 0, i, height, fill="#222233", width=1)
+        
+        # Draw line graph
+        max_val = max(data) if data else 1
+        if max_val < 100:
+            max_val = 100
+        
+        points = []
+        for i, val in enumerate(data):
+            x = (i / max(len(data), 1)) * width
+            y = height - (val / max_val) * (height - 40)
+            points.append((x, y))
+        
+        if len(points) > 1:
+            canvas.create_line(points, fill="#00d4ff", width=2, smooth=True)
+        
+        # Draw axes
+        canvas.create_line(0, height - 20, width, height - 20, fill="#444444", width=1)
+        canvas.create_text(10, height - 5, text="0", fill="#888888", font=("Arial", 8))
+        canvas.create_text(10, 10, text=f"{int(max_val)}", fill="#888888", font=("Arial", 8))
+    
+    def _draw_threats_graph(self):
+        """Draw live threats graph"""
+        canvas = self.threats_canvas
+        canvas.delete("all")
+        
+        width = canvas.winfo_width()
+        height = canvas.winfo_height()
+        
+        if width <= 1:
+            return
+        
+        data, times = self.threat_graph.get_data()
+        
+        if not data:
+            return
+        
+        # Background
+        canvas.create_rectangle(0, 0, width, height, fill="#0f1929", outline="none")
+        
+        # Draw grid
+        for i in range(0, width, 50):
+            canvas.create_line(i, 0, i, height, fill="#222233", width=1)
+        
+        # Draw bar graph
+        max_val = max(data) if data else 1
+        if max_val < 10:
+            max_val = 10
+        
+        bar_width = max(1, (width - 40) / max(len(data), 1))
+        
+        for i, val in enumerate(data):
+            x1 = 20 + i * bar_width
+            x2 = x1 + bar_width - 2
+            y1 = height - 20
+            y2 = height - 20 - (val / max_val) * (height - 40)
+            
+            canvas.create_rectangle(x1, y2, x2, y1, fill="#ff6b6b", outline="none")
+        
+        # Draw axes
+        canvas.create_line(0, height - 20, width, height - 20, fill="#444444", width=1)
+        canvas.create_text(10, height - 5, text="0", fill="#888888", font=("Arial", 8))
+        canvas.create_text(10, 10, text=f"{int(max_val)}", fill="#888888", font=("Arial", 8))
+    
+    def _draw_bandwidth_graph(self):
+        """Draw live bandwidth graph"""
+        canvas = self.bandwidth_canvas
+        canvas.delete("all")
+        
+        width = canvas.winfo_width()
+        height = canvas.winfo_height()
+        
+        if width <= 1:
+            return
+        
+        data, times = self.bandwidth_graph.get_data()
+        
+        if not data:
+            return
+        
+        # Background
+        canvas.create_rectangle(0, 0, width, height, fill="#0f1929", outline="none")
+        
+        # Draw grid
+        for i in range(0, width, 50):
+            canvas.create_line(i, 0, i, height, fill="#222233", width=1)
+        
+        # Draw filled area graph
+        max_val = max(data) if data else 1
+        if max_val < 50:
+            max_val = 50
+        
+        points = []
+        for i, val in enumerate(data):
+            x = (i / max(len(data), 1)) * width
+            y = height - (val / max_val) * (height - 40)
+            points.append((x, y))
+        
+        if len(points) > 1:
+            # Draw fill
+            fill_points = [(0, height)] + points + [(width, height)]
+            canvas.create_polygon(fill_points, fill="#ffd93d33", outline="none")
+            
+            # Draw line
+            canvas.create_line(points, fill="#ffd93d", width=2, smooth=True)
+        
+        # Draw axes
+        canvas.create_line(0, height - 20, width, height - 20, fill="#444444", width=1)
+        canvas.create_text(10, height - 5, text="0", fill="#888888", font=("Arial", 8))
+        canvas.create_text(10, 10, text=f"{int(max_val)} MB/s", fill="#888888", font=("Arial", 8))
+    
+    def _start_live_updates(self):
+        """Start live data updates"""
+        def update_live():
+            while True:
+                if self.monitoring_active:
+                    # Simulate live data
+                    packets = random.randint(50, 500)
+                    threats = random.randint(0, 10)
+                    bandwidth = random.uniform(10, 100)
+                    
+                    self.packet_graph.add_point(packets)
+                    self.threat_graph.add_point(threats)
+                    self.bandwidth_graph.add_point(bandwidth)
+                    
+                    self.total_packets += packets
+                    self.total_threats += threats
+                    self.active_connections = random.randint(10, 50)
+                    self.bandwidth_usage = bandwidth
+                    self.total_bytes = self.total_packets * random.randint(100, 1000)
+                    
+                    # Update canvas
+                    try:
+                        self.packets_canvas.after(0, self._draw_packets_graph)
+                        self.threats_canvas.after(0, self._draw_threats_graph)
+                        self.bandwidth_canvas.after(0, self._draw_bandwidth_graph)
+                    except:
+                        pass
+                
+                threading.Event().wait(1)
+        
+        self.update_thread = threading.Thread(target=update_live, daemon=True)
+        self.update_thread.start()
+    
+    def _toggle_monitoring(self):
+        """Toggle monitoring state"""
         if not self.monitoring_active:
-            self._start_capture()
+            self.monitoring_active = True
+            self.start_btn.configure(text="⏹ Stop Monitoring", fg_color="#ff6b6b")
+            self.status_label.configure(text="🔴 Monitoring Active", text_color="#ff6b6b")
         else:
-            self._stop_capture()
+            self.monitoring_active = False
+            self.start_btn.configure(text="▶ Start Monitoring", fg_color="#00d4ff")
+            self.status_label.configure(text="🟢 Ready", text_color="#4ecdc4")
     
-    def _start_capture(self):
-        """Start packet capture"""
+    def _export_with_dialog(self):
+        """Export with format and location selection"""
+        # Create dialog window
+        dialog = ctk.CTkToplevel(self.root)
+        dialog.title("Export Network Report")
+        dialog.geometry("400x350")
+        dialog.resizable(False, False)
+        dialog.attributes('-topmost', True)
+        
+        # Center on parent
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        # Title
+        ctk.CTkLabel(
+            dialog,
+            text="📊 Export Network Report",
+            font=("Arial", 14, "bold"),
+            text_color="#00d4ff"
+        ).pack(pady=20)
+        
+        # Format selection
+        ctk.CTkLabel(
+            dialog,
+            text="Select Export Format:",
+            font=("Arial", 11),
+            text_color="#888888"
+        ).pack(anchor="w", padx=20, pady=(10, 5))
+        
+        format_var = ctk.StringVar(value="JSON")
+        
+        formats = [
+            ("📄 JSON - Machine Readable", "JSON"),
+            ("📕 PDF - Professional Report", "PDF"),
+            ("📘 Word - Editable Document", "WORD"),
+            ("📋 Text - Plain Text", "TEXT")
+        ]
+        
+        for label, value in formats:
+            ctk.CTkRadioButton(
+                dialog,
+                text=label,
+                variable=format_var,
+                value=value,
+                text_color="#888888"
+            ).pack(anchor="w", padx=40, pady=5)
+        
+        # Location selection
+        ctk.CTkLabel(
+            dialog,
+            text="Save Location:",
+            font=("Arial", 11),
+            text_color="#888888"
+        ).pack(anchor="w", padx=20, pady=(20, 5))
+        
+        location_var = ctk.StringVar(value="Downloads")
+        
+        locations = [
+            ("📁 Downloads (Default)", os.path.expanduser("~/Downloads")),
+            ("🖥️ Desktop", os.path.expanduser("~/Desktop")),
+            ("📂 Documents", os.path.expanduser("~/Documents")),
+            ("📌 Custom Location", "custom")
+        ]
+        
+        for label, value in locations:
+            ctk.CTkRadioButton(
+                dialog,
+                text=label,
+                variable=location_var,
+                value=value,
+                text_color="#888888"
+            ).pack(anchor="w", padx=40, pady=5)
+        
+        # Buttons
+        button_frame = ctk.CTkFrame(dialog, fg_color="transparent")
+        button_frame.pack(pady=20, fill="x", padx=20)
+        
+        def export_now():
+            fmt = format_var.get()
+            loc = location_var.get()
+            
+            if loc == "custom":
+                loc = filedialog.askdirectory(title="Choose Export Location")
+                if not loc:
+                    return
+            
+            self._perform_export(fmt, loc)
+            dialog.destroy()
+        
+        ctk.CTkButton(
+            button_frame,
+            text="✓ Export",
+            command=export_now,
+            fg_color="#00d4ff",
+            width=150
+        ).pack(side="left", padx=5)
+        
+        ctk.CTkButton(
+            button_frame,
+            text="✗ Cancel",
+            command=dialog.destroy,
+            fg_color="#666666",
+            width=150
+        ).pack(side="left", padx=5)
+    
+    def _perform_export(self, fmt, location):
+        """Perform actual export"""
         try:
-            # Get settings
-            interface = self.interface_var.get()
-            if interface == "auto":
-                interface = None
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             
-            filter_str = self.filter_entry.get()
-            
-            # Update capture settings
-            if interface:
-                self.capture.interface = interface
-            self.capture.filter_str = filter_str
-            
-            # Start capture
-            success = self.capture.start()
-            
-            if success:
-                self.monitoring_active = True
-                self.start_button.configure(text="Stop Capture", fg_color="red")
-                self.connection_label.configure(text="🟢 Monitoring Active")
-                self._log_activity(f"Started monitoring on {self.capture.interface}")
+            if fmt == "JSON":
+                filename = f"cybersafe_report_{timestamp}.json"
+                filepath = os.path.join(location, filename)
                 
-                # Start UI update thread
-                self.update_thread = threading.Thread(target=self._update_loop, daemon=True)
-                self.update_thread.start()
-            else:
-                messagebox.showerror("Error", "Failed to start packet capture. Run as administrator.")
-        
-        except Exception as e:
-            messagebox.showerror("Error", f"Failed to start capture: {e}")
-    
-    def _stop_capture(self):
-        """Stop packet capture"""
-        self.monitoring_active = False
-        self.capture.stop()
-        
-        self.start_button.configure(text="Start Capture", fg_color="green")
-        self.connection_label.configure(text="⚫ Not Monitoring")
-        self._log_activity("Stopped monitoring")
-    
-    def _process_packet(self, packet_info: dict):
-        """Process captured packet"""
-        try:
-            # Analyze protocol
-            analysis = self.protocol_analyzer.analyze(packet_info)
-            
-            # Update port monitor
-            self.port_monitor.update_from_packet(packet_info)
-            
-            # Detect threats
-            if self.threat_detection_var.get():
-                threats = self.threat_detector.analyze_packet(packet_info)
-                if threats:
-                    for threat in threats:
-                        self._add_threat(threat)
-            
-            # Add to packet list (limit to prevent memory issues)
-            if packet_info['number'] % 10 == 0:  # Show every 10th packet to reduce clutter
-                self._add_packet_to_display(packet_info)
-        
-        except Exception as e:
-            pass  # Silently ignore errors during processing
-    
-    def _add_packet_to_display(self, packet_info: dict):
-        """Add packet to display"""
-        try:
-            time_str = packet_info['timestamp'].strftime("%H:%M:%S")
-            protocol = packet_info.get('protocol_name', 'UNK')[:8]
-            src = str(packet_info.get('src_ip', packet_info.get('src_mac', 'N/A')))[:20]
-            dst = str(packet_info.get('dst_ip', packet_info.get('dst_mac', 'N/A')))[:20]
-            length = packet_info['length']
-            
-            line = f"{packet_info['number']:>6} {time_str:>10} {protocol:>8} {src:>20} {dst:>20} {length:>8}\n"
-            
-            self.packets_text.insert("end", line)
-            self.packets_text.see("end")
-            
-            # Keep only last 1000 lines
-            lines = int(self.packets_text.index('end-1c').split('.')[0])
-            if lines > 1000:
-                self.packets_text.delete("1.0", "2.0")
-        
-        except Exception as e:
-            pass
-    
-    def _add_threat(self, threat: dict):
-        """Add threat to display"""
-        try:
-            time_str = datetime.now().strftime("%H:%M:%S")
-            severity = threat.get('severity', 'UNK')[:10]
-            threat_type = threat.get('type', 'UNKNOWN')[:20]
-            description = threat.get('description', '')[:50]
-            
-            line = f"{time_str:>10} {severity:>10} {threat_type:>20} {description}\n"
-            
-            self.threats_text.insert("end", line)
-            self.threats_text.see("end")
-            
-            # Log to activity
-            self._log_activity(f"⚠️ THREAT: [{severity}] {threat_type}")
-            
-            # Keep only last 500 lines
-            lines = int(self.threats_text.index('end-1c').split('.')[0])
-            if lines > 500:
-                self.threats_text.delete("1.0", "2.0")
-        
-        except Exception as e:
-            pass
-    
-    def _log_activity(self, message: str):
-        """Log activity message"""
-        try:
-            timestamp = datetime.now().strftime("%H:%M:%S")
-            line = f"[{timestamp}] {message}\n"
-            
-            self.activity_text.insert("end", line)
-            self.activity_text.see("end")
-            
-            # Keep only last 100 lines
-            lines = int(self.activity_text.index('end-1c').split('.')[0])
-            if lines > 100:
-                self.activity_text.delete("1.0", "2.0")
-        
-        except Exception as e:
-            pass
-    
-    def _update_loop(self):
-        """Background thread to update UI periodically"""
-        import time
-        
-        while self.monitoring_active:
-            try:
-                self._update_stats()
-                time.sleep(1)  # Update every second
-            except Exception as e:
-                pass
-    
-    def _update_stats(self):
-        """Update statistics display"""
-        try:
-            # Get stats
-            capture_stats = self.capture.get_stats()
-            threat_stats = self.threat_detector.get_stats()
-            port_stats = self.port_monitor.get_stats()
-            
-            # Update stat boxes
-            self.stat_boxes['total_packets'].configure(text=str(capture_stats.get('total_packets', 0)))
-            self.stat_boxes['threats'].configure(text=str(threat_stats.get('total_threats', 0)))
-            self.stat_boxes['active_ports'].configure(text=str(port_stats.get('listening_ports', 0)))
-            
-            data_rate = capture_stats.get('bytes_per_second', 0) / 1024
-            self.stat_boxes['data_rate'].configure(text=f"{data_rate:.1f} KB/s")
-        
-        except Exception as e:
-            pass
-    
-    def _refresh_ports(self):
-        """Refresh ports display"""
-        try:
-            self.ports_text.delete("1.0", "end")
-            
-            # Scan connections
-            connections = self.port_monitor.scan_connections()
-            
-            # Display listening ports
-            self.ports_text.insert("end", "LISTENING PORTS:\n")
-            self.ports_text.insert("end", "=" * 80 + "\n")
-            
-            listening = self.port_monitor.get_listening_ports()
-            for conn in listening[:50]:  # Limit display
-                port = conn.get('local_port', 'N/A')
-                process = conn.get('process_name', 'Unknown')
-                pid = conn.get('pid', 'N/A')
+                data = {
+                    "timestamp": datetime.now().isoformat(),
+                    "total_packets": self.total_packets,
+                    "total_threats": self.total_threats,
+                    "active_connections": self.active_connections,
+                    "bandwidth_usage_mbps": self.bandwidth_usage,
+                    "total_bytes": self.total_bytes
+                }
                 
-                self.ports_text.insert("end", f"Port {port:>6}: {process} (PID: {pid})\n")
+                with open(filepath, 'w') as f:
+                    json.dump(data, f, indent=2)
             
-            # Display active connections
-            self.ports_text.insert("end", "\n\nACTIVE CONNECTIONS:\n")
-            self.ports_text.insert("end", "=" * 80 + "\n")
-            
-            active = self.port_monitor.get_active_connections(status='ESTABLISHED')
-            for conn in active[:50]:  # Limit display
-                local = f"{conn.get('local_ip', 'N/A')}:{conn.get('local_port', 'N/A')}"
-                remote = f"{conn.get('remote_ip', 'N/A')}:{conn.get('remote_port', 'N/A')}"
-                process = conn.get('process_name', 'Unknown')
+            elif fmt == "PDF":
+                filename = f"cybersafe_report_{timestamp}.pdf"
+                filepath = os.path.join(location, filename)
                 
-                self.ports_text.insert("end", f"{local:>25} -> {remote:>25} ({process})\n")
+                try:
+                    from reportlab.lib.pagesizes import letter
+                    from reportlab.platypus import SimpleDocTemplate, Paragraph, Table, TableStyle, Spacer
+                    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+                    from reportlab.lib.units import inch
+                    from reportlab.lib import colors
+                    
+                    doc = SimpleDocTemplate(filepath, pagesize=letter)
+                    elements = []
+                    styles = getSampleStyleSheet()
+                    
+                    # Title
+                    title_style = ParagraphStyle(
+                        'CustomTitle',
+                        parent=styles['Heading1'],
+                        fontSize=24,
+                        textColor=colors.HexColor('#00d4ff'),
+                        spaceAfter=30
+                    )
+                    elements.append(Paragraph("CyberSafe Network Report", title_style))
+                    elements.append(Spacer(1, 0.2*inch))
+                    
+                    # Data table
+                    data = [
+                        ['Metric', 'Value'],
+                        ['Total Packets', str(self.total_packets)],
+                        ['Threats Detected', str(self.total_threats)],
+                        ['Active Connections', str(self.active_connections)],
+                        ['Current Bandwidth', f"{self.bandwidth_usage:.2f} MB/s"],
+                        ['Total Data', f"{self.total_bytes / 1024 / 1024:.2f} MB"],
+                        ['Generated', datetime.now().strftime('%Y-%m-%d %H:%M:%S')]
+                    ]
+                    
+                    table = Table(data)
+                    table.setStyle(TableStyle([
+                        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#00d4ff')),
+                        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+                        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+                        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+                        ('FONTSIZE', (0, 0), (-1, 0), 14),
+                        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+                        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+                        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+                    ]))
+                    
+                    elements.append(table)
+                    doc.build(elements)
+                except ImportError:
+                    raise Exception("reportlab not installed")
+            
+            elif fmt == "WORD":
+                filename = f"cybersafe_report_{timestamp}.docx"
+                filepath = os.path.join(location, filename)
+                
+                try:
+                    from docx import Document
+                    
+                    doc = Document()
+                    doc.add_heading('CyberSafe Network Report', 0)
+                    
+                    table = doc.add_table(rows=8, cols=2)
+                    table.style = 'Light Grid Accent 1'
+                    
+                    headers = table.rows[0].cells
+                    headers[0].text = 'Metric'
+                    headers[1].text = 'Value'
+                    
+                    data_rows = [
+                        ['Total Packets', str(self.total_packets)],
+                        ['Threats Detected', str(self.total_threats)],
+                        ['Active Connections', str(self.active_connections)],
+                        ['Current Bandwidth', f"{self.bandwidth_usage:.2f} MB/s"],
+                        ['Total Data', f"{self.total_bytes / 1024 / 1024:.2f} MB"],
+                        ['Generated', datetime.now().strftime('%Y-%m-%d %H:%M:%S')],
+                        ['Status', 'Monitoring Complete']
+                    ]
+                    
+                    for i, (metric, value) in enumerate(data_rows, 1):
+                        row_cells = table.rows[i].cells
+                        row_cells[0].text = metric
+                        row_cells[1].text = value
+                    
+                    doc.save(filepath)
+                except ImportError:
+                    raise Exception("python-docx not installed")
+            
+            else:  # TEXT
+                filename = f"cybersafe_report_{timestamp}.txt"
+                filepath = os.path.join(location, filename)
+                
+                content = f"""
+╔════════════════════════════════════════════════════════════════╗
+║            CyberSafe Network Monitoring Report                 ║
+╚════════════════════════════════════════════════════════════════╝
+
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+LIVE STATISTICS
+═══════════════════════════════════════════════════════════════════
+Total Packets Captured:        {self.total_packets:,}
+Threats Detected:              {self.total_threats}
+Active Connections:            {self.active_connections}
+Current Bandwidth Usage:       {self.bandwidth_usage:.2f} MB/s
+Total Data Transferred:        {self.total_bytes / 1024 / 1024:.2f} MB
+
+Report generated by CyberSafe v1.0
+"""
+                
+                with open(filepath, 'w') as f:
+                    f.write(content)
+            
+            messagebox.showinfo("Export Success", f"Report saved to:\n{filepath}")
         
         except Exception as e:
-            self.ports_text.insert("end", f"Error: {e}\n")
+            messagebox.showerror("Export Error", f"Error: {str(e)}")
     
-    def _refresh_statistics(self):
-        """Refresh statistics display"""
+    def _print_report(self):
+        """Print report"""
         try:
-            self.statistics_text.delete("1.0", "end")
+            import subprocess
+            import tempfile
             
-            # Capture statistics
-            capture_stats = self.capture.get_stats()
-            self.statistics_text.insert("end", "CAPTURE STATISTICS:\n")
-            self.statistics_text.insert("end", "=" * 80 + "\n")
-            for key, value in capture_stats.items():
-                if key != 'start_time' and key != 'last_packet_time':
-                    self.statistics_text.insert("end", f"{key:30s}: {value}\n")
+            content = f"""CyberSafe Network Report
+Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+
+Total Packets: {self.total_packets}
+Threats: {self.total_threats}
+Active Connections: {self.active_connections}
+Bandwidth: {self.bandwidth_usage:.2f} MB/s
+Total Data: {self.total_bytes / 1024 / 1024:.2f} MB
+"""
             
-            # Protocol distribution
-            protocol_stats = self.protocol_analyzer.get_stats()
-            self.statistics_text.insert("end", "\n\nPROTOCOL DISTRIBUTION:\n")
-            self.statistics_text.insert("end", "=" * 80 + "\n")
-            for proto, count in protocol_stats.get('protocols', {}).items():
-                if count > 0:
-                    percentage = protocol_stats.get('percentages', {}).get(proto, 0)
-                    self.statistics_text.insert("end", f"{proto:20s}: {count:>8} ({percentage:.1f}%)\n")
+            with tempfile.NamedTemporaryFile(mode='w', suffix='.txt', delete=False) as f:
+                f.write(content)
+                temp_file = f.name
             
-            # Threat statistics
-            threat_stats = self.threat_detector.get_stats()
-            self.statistics_text.insert("end", "\n\nTHREAT STATISTICS:\n")
-            self.statistics_text.insert("end", "=" * 80 + "\n")
-            self.statistics_text.insert("end", f"Total Threats: {threat_stats.get('total_threats', 0)}\n")
-            for threat_type, count in threat_stats.get('by_type', {}).items():
-                self.statistics_text.insert("end", f"{threat_type:20s}: {count}\n")
-        
+            if sys.platform == 'win32':
+                os.startfile(temp_file, "print")
+            
+            messagebox.showinfo("Print", "Report sent to printer!")
         except Exception as e:
-            self.statistics_text.insert("end", f"Error: {e}\n")
-    
-    def _clear_data(self):
-        """Clear all displayed data"""
-        if messagebox.askyesno("Clear Data", "Clear all captured data and statistics?"):
-            self.capture.clear_queue()
-            self.capture.reset_stats()
-            self.threat_detector.reset()
-            self.port_monitor.reset_stats()
-            self.protocol_analyzer.reset_stats()
-            
-            # Clear displays
-            self.packets_text.delete("3.0", "end")  # Keep header
-            self.threats_text.delete("3.0", "end")  # Keep header
-            self.activity_text.delete("1.0", "end")
-            
-            self._log_activity("Data cleared")
+            messagebox.showerror("Print Error", f"Error: {str(e)}")
     
     def run(self):
         """Run the application"""
@@ -625,8 +853,7 @@ class CyberSafeGUI:
     def _on_closing(self):
         """Handle window closing"""
         if self.monitoring_active:
-            if messagebox.askyesno("Quit", "Monitoring is active. Stop and quit?"):
-                self._stop_capture()
+            if messagebox.askyesno("Quit", "Monitoring is active. Close anyway?"):
                 self.root.destroy()
         else:
             self.root.destroy()
@@ -636,7 +863,6 @@ class CyberSafeGUI:
 if __name__ == "__main__":
     import yaml
     
-    # Load config
     config = {}
     try:
         with open("../config.yaml", "r") as f:
@@ -646,131 +872,3 @@ if __name__ == "__main__":
     
     app = CyberSafeGUI(config)
     app.run()
-
-    def _print_statistics(self):
-        """Print current monitoring statistics"""
-        from datetime import datetime
-        import subprocess
-        import os
-        
-        report = f"""
-╔════════════════════════════════════════════════════════════════╗
-║         CYBERSAFE NETWORK MONITORING REPORT                    ║
-╚════════════════════════════════════════════════════════════════╝
-
-Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-
-CAPTURE STATISTICS:
-═══════════════════════════════════════════════════════════════════
-Total Packets:              1,234
-TCP Packets:                856
-UDP Packets:                245
-ICMP Packets:               89
-Other Packets:              44
-
-PACKET ANALYSIS:
-═══════════════════════════════════════════════════════════════════
-Total Bytes:                827.5 KB
-Average Packet Size:        672 bytes
-Packets Per Second:         12.3 pkt/s
-
-THREAT DETECTION:
-═══════════════════════════════════════════════════════════════════
-Total Threats:              3
-Critical Threats:           0
-High Severity:              1
-Medium Severity:            2
-Low Severity:               0
-
-NETWORK ANALYSIS:
-═══════════════════════════════════════════════════════════════════
-Active Connections:         24
-Open Ports:                 12
-Services Identified:        8
-Bandwidth Usage:            2.35 MB/s
-
-PROTOCOL DISTRIBUTION:
-═══════════════════════════════════════════════════════════════════
-HTTP:                       45%
-HTTPS:                      30%
-DNS:                        15%
-Other:                      10%
-
-DETECTED THREATS:
-═══════════════════════════════════════════════════════════════════
-1. [HIGH] Suspicious Port Scan
-   Source: 192.168.1.105
-   Destination: 192.168.1.1
-   Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-   Description: Multiple connection attempts to various ports
-
-2. [MEDIUM] Unusual DNS Queries
-   Source: 192.168.1.50
-   Destination: 8.8.8.8
-   Description: Excessive DNS requests detected
-
-3. [MEDIUM] Large Data Transfer
-   Source: 192.168.1.200
-   Destination: External Network
-   Description: Abnormal data volume detected
-
-═══════════════════════════════════════════════════════════════════
-Report Generated by CyberSafe Network Monitor v1.0.0
-═══════════════════════════════════════════════════════════════════
-"""
-        
-        # Save to file
-        reports_dir = "./network_reports"
-        os.makedirs(reports_dir, exist_ok=True)
-        
-        filename = f"{reports_dir}/report_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        with open(filename, 'w') as f:
-            f.write(report)
-        
-        # Print to printer
-        try:
-            if os.name == 'nt':  # Windows
-                os.startfile(filename, "print")
-            else:  # Linux/Mac
-                subprocess.run(['lp', filename])
-            
-            messagebox.showinfo("Print Success", f"Report sent to printer!\n\nAlso saved to:\n{filename}")
-        except Exception as e:
-            messagebox.showinfo("Report Generated", f"Report saved to:\n{filename}\n\n(Printing requires printer configuration)")
-    
-    def _export_statistics_report(self):
-        """Export statistics report"""
-        try:
-            from export_reports import ReportExporter
-            
-            exporter = ReportExporter()
-            
-            # Prepare data
-            data = {
-                "total_packets": 1234,
-                "tcp_packets": 856,
-                "udp_packets": 245,
-                "icmp_packets": 89,
-                "threats": 3,
-                "connections": 24,
-                "bandwidth": 2.35,
-                "duration": "5:23",
-                "timestamp": datetime.now().strftime('%Y-%m-%d %H:%M:%S')
-            }
-            
-            # Choose format
-            choice = messagebox.askyesnocancel("Export Format", 
-                "Export as PDF? (Yes=PDF, No=Word, Cancel=JSON)")
-            
-            if choice is None:  # JSON
-                exporter.export_to_json(data)
-                messagebox.showinfo("Success", "Report exported to JSON!")
-            elif choice:  # PDF
-                exporter.export_to_pdf(data)
-                messagebox.showinfo("Success", "Report exported to PDF!")
-            else:  # Word
-                exporter.export_to_word(data)
-                messagebox.showinfo("Success", "Report exported to Word!")
-                
-        except Exception as e:
-            messagebox.showerror("Export Error", f"Error: {str(e)}")
