@@ -62,7 +62,7 @@ git add -A
 
 echo.
 echo [*] Creating commit...
-git commit -m "CyberSafe Update: Wireshark UI, separated graphs, export system, automated deployment" 2>nul
+git commit -m "CyberSafe: Full LIVE monitoring - Interface selection, real packet capture, threat detection, port monitoring, live graphs" 2>nul
 
 if %errorlevel% neq 0 (
     echo [WARNING] No changes to commit (or commit failed)
