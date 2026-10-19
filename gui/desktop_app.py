@@ -36,6 +36,14 @@ class CyberSafeGUI:
         self.config = config or {}
         self.monitoring_active = False
         
+        # Initialize user tracking
+        try:
+            from core.user_tracker import get_tracker
+            self.tracker = get_tracker()
+        except Exception as e:
+            self.tracker = None
+            print(f"Warning: User tracking unavailable ({e})")
+        
         # Core components for LIVE monitoring
         self.packet_capture = None
         self.threat_detector = None

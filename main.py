@@ -174,6 +174,14 @@ def run_gui(config: dict, args):
     """Run GUI application"""
     print("Starting CyberSafe GUI...")
     
+    # Track app launch
+    try:
+        from core.user_tracker import track_app_launch, track_first_launch
+        track_first_launch()  # Track first launch
+        track_app_launch()    # Track this launch
+    except Exception as e:
+        print(f"Note: Analytics tracking disabled ({e})")
+    
     try:
         from gui.desktop_app import CyberSafeGUI
         
