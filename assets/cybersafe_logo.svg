@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+  <!-- Background -->
+  <rect width="512" height="512" fill="#000000"/>
+  
+  <!-- Shield -->
+  <polygon points="256,100 400,170 400,330 256,450 112,330 112,170" 
+           fill="#00D4FF" stroke="#FFFFFF" stroke-width="3"/>
+  
+  <!-- CS Text -->
+  <text x="256" y="320" font-family="Arial" font-size="120" font-weight="bold" 
+        fill="#000000" text-anchor="middle">CS</text>
+  
+  <!-- CyberSafe Text -->
+  <text x="256" y="470" font-family="Arial" font-size="32" font-weight="bold" 
+        fill="#00D4FF" text-anchor="middle">CyberSafe</text>
+</svg>

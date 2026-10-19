@@ -1,0 +1,105 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.pyc
+
+# Virtual Environment
+venv/
+ENV/
+env/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Database
+data/*.db
+data/*.db-journal
+*.sqlite
+*.sqlite3
+
+# Exports
+exports/*.pcap
+exports/*.json
+exports/*.csv
+
+# Configuration (local overrides)
+config.local.yaml
+.env
+
+# Packet captures
+*.pcap
+*.pcapng
+
+# Node modules (for mobile app)
+mobile/node_modules/
+mobile/package-lock.json
+
+# React Native
+mobile/.expo/
+mobile/.expo-shared/
+mobile/android/app/build/
+mobile/ios/Pods/
+mobile/ios/build/
+
+# Mobile builds
+*.apk
+*.ipa
+*.aab
+
+# Temporary files
+temp/
+tmp/
+*.tmp
+
+# OS specific
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+coverage.xml
+*.cover
+
+# Documentation builds
+docs/_build/
+site/
+
+# Secrets
+*.key
+*.pem
+*.cert
+secrets/
+credentials/

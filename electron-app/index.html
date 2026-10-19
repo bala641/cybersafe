@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CyberSafe Network Monitor</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Loading Screen -->
+    <div id="loading" class="loading-screen">
+        <div class="loading-content">
+            <div class="logo">🛡️</div>
+            <h1>CyberSafe Network Monitor</h1>
+            <div class="spinner"></div>
+            <p>Loading...</p>
+        </div>
+    </div>
+
+    <!-- Main App -->
+    <div id="app" style="display: none;">
+        <!-- Top Bar -->
+        <div class="topbar">
+            <div class="topbar-left">
+                <div class="logo-small">🛡️</div>
+                <h2>CyberSafe</h2>
+            </div>
+            <div class="topbar-center">
+                <button class="nav-btn active" data-view="dashboard">Dashboard</button>
+                <button class="nav-btn" data-view="packets">Packets</button>
+                <button class="nav-btn" data-view="threats">Threats</button>
+                <button class="nav-btn" data-view="ports">Ports</button>
+                <button class="nav-btn" data-view="stats">Statistics</button>
+            </div>
+            <div class="topbar-right">
+                <button id="startBtn" class="control-btn start-btn">▶ Start</button>
+                <button id="stopBtn" class="control-btn stop-btn" style="display:none;">⏸ Stop</button>
+                <span id="status" class="status">⚫ Not Monitoring</span>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="content">
+            <!-- Dashboard View -->
+            <div id="dashboard-view" class="view active">
+                <div class="dashboard-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">📦</div>
+                        <div class="stat-info">
+                            <div class="stat-label">Total Packets</div>
+                            <div id="total-packets" class="stat-value">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">⚠️</div>
+                        <div class="stat-info">
+                            <div class="stat-label">Threats Detected</div>
+                            <div id="total-threats" class="stat-value">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">🔌</div>
+                        <div class="stat-info">
+                            <div class="stat-label">Active Ports</div>
+                            <div id="active-ports" class="stat-value">0</div>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">📊</div>
+                        <div class="stat-info">
+                            <div class="stat-label">Data Rate</div>
+                            <div id="data-rate" class="stat-value">0 KB/s</div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3>Protocol Distribution</h3>
+                        <canvas id="protocolChart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Recent Activity</h3>
+                        <div id="activity-log" class="activity-log"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Packets View -->
+            <div id="packets-view" class="view">
+                <div class="packets-table">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Time</th>
+                                <th>Protocol</th>
+                                <th>Source</th>
+                                <th>Destination</th>
+                                <th>Length</th>
+                            </tr>
+                        </thead>
+                        <tbody id="packets-tbody"></tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- Threats View -->
+            <div id="threats-view" class="view">
+                <div id="threats-list" class="threats-list"></div>
+            </div>
+
+            <!-- Ports View -->
+            <div id="ports-view" class="view">
+                <div id="ports-list" class="ports-list"></div>
+            </div>
+
+            <!-- Stats View -->
+            <div id="stats-view" class="view">
+                <div id="stats-content" class="stats-content"></div>
+            </div>
+        </div>
+
+        <!-- Status Bar -->
+        <div class="statusbar">
+            <span id="connection-status">⚫ Not Connected</span>
+            <span id="packet-count">Packets: 0</span>
+            <span id="time"></span>
+        </div>
+    </div>
+
+    <script src="renderer.js"></script>
+</body>
+</html>
