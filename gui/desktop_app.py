@@ -1464,10 +1464,10 @@ class CyberSafeGUI:
             print(f"Error drawing graph: {e}")
     
     def _export_dialog(self):
-        """Export dialog - Professional style"""
+        """Export dialog - Professional style with scrolling"""
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Export Report")
-        dialog.geometry("400x450")
+        dialog.geometry("400x500")
         dialog.configure(fg_color="#1a1a1a")
         dialog.transient(self.root)
         dialog.grab_set()
@@ -1484,12 +1484,18 @@ class CyberSafeGUI:
             text_color="#2196F3"
         ).pack(pady=15)
         
-        content = ctk.CTkFrame(dialog, fg_color="#1a1a1a")
-        content.pack(fill="both", expand=True, padx=20, pady=20)
+        # Scrollable content area
+        scroll_frame = ctk.CTkScrollableFrame(
+            dialog, 
+            fg_color="#1a1a1a",
+            scrollbar_button_color="#333333",
+            scrollbar_button_hover_color="#555555"
+        )
+        scroll_frame.pack(fill="both", expand=True, padx=20, pady=(10, 10))
         
         # Format Section
         format_label = ctk.CTkLabel(
-            content, 
+            scroll_frame, 
             text="Format:", 
             font=("Roboto", 11, "bold"), 
             text_color="#ffffff",
@@ -1508,7 +1514,7 @@ class CyberSafeGUI:
         
         for label, val, color in format_options:
             radio = ctk.CTkRadioButton(
-                content,
+                scroll_frame,
                 text=label,
                 variable=fmt_var,
                 value=val,
@@ -1522,11 +1528,11 @@ class CyberSafeGUI:
             radio.pack(anchor="w", padx=10, pady=5)
         
         # Separator
-        ctk.CTkFrame(content, fg_color="#333333", height=1).pack(fill="x", pady=15)
+        ctk.CTkFrame(scroll_frame, fg_color="#333333", height=1).pack(fill="x", pady=15)
         
         # Location Section
         location_label = ctk.CTkLabel(
-            content, 
+            scroll_frame, 
             text="Location:", 
             font=("Roboto", 11, "bold"), 
             text_color="#ffffff",
@@ -1545,7 +1551,7 @@ class CyberSafeGUI:
         
         for label, val in location_options:
             radio = ctk.CTkRadioButton(
-                content,
+                scroll_frame,
                 text=label,
                 variable=loc_var,
                 value=val,
@@ -1558,7 +1564,7 @@ class CyberSafeGUI:
             )
             radio.pack(anchor="w", padx=10, pady=5)
         
-        # Buttons
+        # Buttons (fixed at bottom, not scrollable)
         btn_frame = ctk.CTkFrame(dialog, fg_color="#0a0a0a", height=60)
         btn_frame.pack(fill="x", side="bottom")
         btn_frame.pack_propagate(False)
