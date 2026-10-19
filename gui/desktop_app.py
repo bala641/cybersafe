@@ -91,6 +91,7 @@ class CyberSafeGUI:
         self.root = ctk.CTk()
         self.root.title("CyberSafe Network Monitor - Professional Dashboard [LIVE]")
         self.root.geometry("1920x1200")
+        self.root.configure(fg_color="#0a0a0a")  # Dark charcoal background
         
         try:
             icon_path = "./assets/cybersafe_logo.ico"
@@ -121,41 +122,29 @@ class CyberSafeGUI:
             self.selected_interface = "auto"
     
     def _create_ui(self):
-        """Create professional dashboard"""
-        main = ctk.CTkFrame(self.root, fg_color="#0a0e27")
+        """Create professional dashboard with navigation"""
+        main = ctk.CTkFrame(self.root, fg_color="#0a0a0a")  # Dark charcoal
         main.pack(fill="both", expand=True)
         
         # Header with interface selection
         self._create_header(main)
         
-        # Main content - scrollable
-        scroll_frame = ctk.CTkScrollableFrame(main, fg_color="#0a0e27")
-        scroll_frame.pack(fill="both", expand=True, padx=10, pady=10)
+        # Navigation buttons (4 options centered)
+        self._create_navigation(main)
         
-        # Live Stats Summary Section
-        self._create_live_stats_section(scroll_frame)
+        # Container for switching views
+        self.content_container = ctk.CTkFrame(main, fg_color="#0a0a0a")  # Dark charcoal
+        self.content_container.pack(fill="both", expand=True, padx=10, pady=10)
         
-        # Network Traffic Section (Bandwidth & Packets)
-        self._create_network_section(scroll_frame)
+        # Create all views (hidden by default)
+        self._create_all_views()
         
-        # Devices Section (Real device tracking)
-        self._create_devices_section(scroll_frame)
-        
-        # Security Section (Real threats)
-        self._create_security_section(scroll_frame)
-        
-        # Router Graphs Section (3 live graphs)
-        self._create_router_section(scroll_frame)
-        
-        # Protocol Distribution
-        self._create_protocol_section(scroll_frame)
-        
-        # Tabs for detailed LIVE view
-        self._create_details_tabs(main)
+        # Show dashboard by default
+        self._show_view("dashboard")
     
     def _create_header(self, parent):
         """Create header with interface selector"""
-        header = ctk.CTkFrame(parent, fg_color="#1a2744", height=80)
+        header = ctk.CTkFrame(parent, fg_color="#1a1a1a", height=80, corner_radius=0)  # Flat dark grey
         header.pack(fill="x", padx=0, pady=0)
         header.pack_propagate(False)
         
@@ -165,15 +154,15 @@ class CyberSafeGUI:
         ctk.CTkLabel(
             left,
             text="🔍 CyberSafe Network Monitor [LIVE]",
-            font=("Arial", 18, "bold"),
-            text_color="#00d4ff"
+            font=("Roboto", 18, "bold"),
+            text_color="#ffffff"  # White text
         ).pack(anchor="w")
         
         ctk.CTkLabel(
             left,
             text="Real-time Network Traffic Analysis & Threat Detection",
-            font=("Arial", 10),
-            text_color="#888888"
+            font=("Roboto", 9),
+            text_color="#666666"  # Muted grey
         ).pack(anchor="w")
         
         # Interface selector in center
@@ -183,8 +172,8 @@ class CyberSafeGUI:
         ctk.CTkLabel(
             center,
             text="Network Interface:",
-            font=("Arial", 10, "bold"),
-            text_color="#4ecdc4"
+            font=("Roboto", 10, "bold"),
+            text_color="#888888"
         ).pack(side="left", padx=(0, 10))
         
         interface_names = list(self.interfaces.keys())
@@ -196,8 +185,10 @@ class CyberSafeGUI:
             variable=self.interface_var,
             width=200,
             command=self._on_interface_change,
-            fg_color="#0f1929",
-            border_color="#00d4ff"
+            fg_color="#0a0a0a",
+            border_color="#333333",
+            button_color="#2a2a2a",
+            button_hover_color="#3a3a3a"
         )
         self.interface_menu.pack(side="left")
         
@@ -208,8 +199,8 @@ class CyberSafeGUI:
         self.status_label = ctk.CTkLabel(
             right,
             text="🟡 Ready to Monitor",
-            font=("Arial", 11, "bold"),
-            text_color="#ffd93d"
+            font=("Roboto", 11, "bold"),
+            text_color="#FFC107"
         )
         self.status_label.pack()
         
@@ -220,10 +211,12 @@ class CyberSafeGUI:
             btn_frame,
             text="▶ Start Capture",
             command=self._toggle_monitoring,
-            fg_color="#00d4ff",
+            fg_color="#4CAF50",
+            hover_color="#66BB6A",
             width=120,
             height=35,
-            font=("Arial", 12, "bold")
+            font=("Roboto", 12, "bold"),
+            corner_radius=6
         )
         self.capture_btn.pack(side="left", padx=5)
         
@@ -231,11 +224,549 @@ class CyberSafeGUI:
             btn_frame,
             text="💾 Export",
             command=self._export_dialog,
-            fg_color="#4ecdc4",
+            fg_color="#2196F3",
+            hover_color="#42A5F5",
             width=90,
             height=35,
-            font=("Arial", 11, "bold")
+            font=("Roboto", 11, "bold"),
+            corner_radius=6
         ).pack(side="left", padx=5)
+    
+    def _create_navigation(self, parent):
+        """Create centered navigation buttons"""
+        nav_frame = ctk.CTkFrame(parent, fg_color="#1a1a1a", height=70, corner_radius=0)
+        nav_frame.pack(fill="x", padx=0, pady=0)
+        nav_frame.pack_propagate(False)
+        
+        # Center container for buttons
+        center = ctk.CTkFrame(nav_frame, fg_color="transparent")
+        center.place(relx=0.5, rely=0.5, anchor="center")
+        
+        # Navigation buttons
+        nav_buttons = [
+            ("📊 Dashboard", "dashboard", "#2196F3"),
+            ("📦 Live Packets", "packets", "#4CAF50"),
+            ("⚠️ Threat Detection", "threats", "#F44336"),
+            ("🔌 Active Ports", "ports", "#FFC107")
+        ]
+        
+        self.nav_buttons = {}
+        
+        for text, view_name, color in nav_buttons:
+            btn = ctk.CTkButton(
+                center,
+                text=text,
+                command=lambda v=view_name: self._show_view(v),
+                width=200,
+                height=50,
+                font=("Roboto", 14, "bold"),
+                fg_color="#0a0a0a",
+                hover_color="#2a2a2a",
+                border_width=1,
+                border_color="#333333",
+                text_color="#888888",
+                corner_radius=6
+            )
+            btn.pack(side="left", padx=10)
+            self.nav_buttons[view_name] = btn
+    
+    def _create_all_views(self):
+        """Create all view containers"""
+        # Dashboard view
+        self.dashboard_view = ctk.CTkScrollableFrame(self.content_container, fg_color="#0a0a0a")
+        self._create_dashboard_content(self.dashboard_view)
+        
+        # Packets view
+        self.packets_view = ctk.CTkFrame(self.content_container, fg_color="#0a0a0a")
+        self._create_packets_content(self.packets_view)
+        
+        # Threats view
+        self.threats_view = ctk.CTkFrame(self.content_container, fg_color="#0a0a0a")
+        self._create_threats_content(self.threats_view)
+        
+        # Ports view
+        self.ports_view = ctk.CTkFrame(self.content_container, fg_color="#0a0a0a")
+        self._create_ports_content(self.ports_view)
+        
+        # Store views
+        self.views = {
+            "dashboard": self.dashboard_view,
+            "packets": self.packets_view,
+            "threats": self.threats_view,
+            "ports": self.ports_view
+        }
+        
+        self.current_view = None
+    
+    def _show_view(self, view_name):
+        """Switch to specified view"""
+        # Hide current view
+        if self.current_view:
+            self.views[self.current_view].pack_forget()
+        
+        # Show new view
+        self.views[view_name].pack(fill="both", expand=True)
+        self.current_view = view_name
+        
+        # Update button colors to show active state
+        for name, btn in self.nav_buttons.items():
+            if name == view_name:
+                # Active button - filled with color
+                colors = {
+                    "dashboard": "#2196F3",
+                    "packets": "#4CAF50",
+                    "threats": "#F44336",
+                    "ports": "#FFC107"
+                }
+                btn.configure(fg_color=colors[name], text_color="#ffffff", border_color=colors[name])
+            else:
+                # Inactive button - dark with grey text
+                btn.configure(fg_color="#0a0a0a", text_color="#888888", border_color="#333333")
+    
+    def _create_dashboard_content(self, parent):
+        """Create dashboard view content with professional grid layout"""
+        
+        # Top metrics row - compact grid layout
+        top_metrics = ctk.CTkFrame(parent, fg_color="transparent")
+        top_metrics.pack(fill="x", pady=(0, 15))
+        
+        # WAN Section - compact
+        wan_card = ctk.CTkFrame(top_metrics, fg_color="#1a1a1a", corner_radius=8, border_width=1, border_color="#2a2a2a")
+        wan_card.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        
+        ctk.CTkLabel(wan_card, text="WAN", font=("Roboto", 10), text_color="#666666", anchor="w").pack(pady=(8, 2), padx=10, anchor="w")
+        
+        wan_metrics = ctk.CTkFrame(wan_card, fg_color="transparent")
+        wan_metrics.pack(fill="x", padx=10, pady=(0, 8))
+        
+        # 3 columns in WAN
+        for i, (icon, label, value, color) in enumerate([
+            ("🌐", "UPC", "0.0%", "#4CAF50"),
+            ("🔒", "VPN", "0.0%", "#2196F3"),
+            ("📡", "LTE", "N/C", "#666666")
+        ]):
+            col = ctk.CTkFrame(wan_metrics, fg_color="transparent")
+            col.pack(side="left", expand=True)
+            ctk.CTkLabel(col, text=icon, font=("Segoe UI Emoji", 16)).pack()
+            ctk.CTkLabel(col, text=value, font=("Roboto", 18, "bold"), text_color=color).pack()
+            ctk.CTkLabel(col, text=label, font=("Roboto", 8), text_color="#666666").pack()
+        
+        # DEVICES Section - compact
+        dev_card = ctk.CTkFrame(top_metrics, fg_color="#1a1a1a", corner_radius=8, border_width=1, border_color="#2a2a2a")
+        dev_card.pack(side="left", fill="both", expand=True, padx=10)
+        
+        ctk.CTkLabel(dev_card, text="DEVICES", font=("Roboto", 10), text_color="#666666", anchor="w").pack(pady=(8, 2), padx=10, anchor="w")
+        
+        dev_metrics = ctk.CTkFrame(dev_card, fg_color="transparent")
+        dev_metrics.pack(fill="x", padx=10, pady=(0, 8))
+        
+        dev_data = ctk.CTkFrame(dev_metrics, fg_color="transparent")
+        dev_data.pack()
+        
+        # Devices numbers
+        for i, (icon, label, var_name, color) in enumerate([
+            ("📱", "WIRED", "devices_label", "#FFC107"),
+            ("📶", "WIFI", "wifi_label", "#2196F3"),
+            ("👥", "GUESTS", "guest_label", "#666666")
+        ]):
+            col = ctk.CTkFrame(dev_data, fg_color="transparent")
+            col.pack(side="left", padx=15)
+            ctk.CTkLabel(col, text=icon, font=("Segoe UI Emoji", 16)).pack()
+            lbl = ctk.CTkLabel(col, text="0", font=("Roboto", 18, "bold"), text_color=color)
+            lbl.pack()
+            setattr(self, var_name, lbl)
+            ctk.CTkLabel(col, text=label, font=("Roboto", 8), text_color="#666666").pack()
+        
+        self.guest_label = dev_data.winfo_children()[2].winfo_children()[1]
+        
+        # ADGUARD/SECURITY Section - compact with mini charts
+        sec_card = ctk.CTkFrame(top_metrics, fg_color="#1a1a1a", corner_radius=8, border_width=1, border_color="#2a2a2a")
+        sec_card.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        
+        ctk.CTkLabel(sec_card, text="SECURITY", font=("Roboto", 10), text_color="#666666", anchor="w").pack(pady=(8, 2), padx=10, anchor="w")
+        
+        sec_row1 = ctk.CTkFrame(sec_card, fg_color="transparent")
+        sec_row1.pack(fill="x", padx=10)
+        
+        # Security metrics with mini charts
+        for icon, label, var_name, color, chart_color in [
+            ("🛡️", "Filtering", "filter_label", "#4CAF50", "#4CAF50"),
+            ("⚠️", "Parental", "parent_label", "#FF9800", "#FF9800"),
+            ("🔐", "Protection", "prot_label", "#2196F3", "#2196F3")
+        ]:
+            col = ctk.CTkFrame(sec_row1, fg_color="transparent")
+            col.pack(side="left", expand=True)
+            
+            # Mini chart
+            mini_canvas = ctk.CTkCanvas(col, bg="#0a0a0a", highlightthickness=0, height=30, width=60)
+            mini_canvas.pack()
+            # Draw simple gradient line
+            for i in range(10):
+                x = i * 6
+                y = 25 - (i % 3) * 8
+                mini_canvas.create_line(x, 25, x, y, fill=chart_color, width=2)
+            
+            lbl = ctk.CTkLabel(col, text="0", font=("Roboto", 14, "bold"), text_color=color)
+            lbl.pack()
+            setattr(self, var_name, lbl)
+            ctk.CTkLabel(col, text=label, font=("Roboto", 7), text_color="#666666").pack()
+        
+        sec_row2 = ctk.CTkFrame(sec_card, fg_color="transparent")
+        sec_row2.pack(fill="x", padx=10, pady=(5, 8))
+        
+        for icon, label, var_name, color, chart_color in [
+            ("🌐", "Browsing", "brow_label", "#9C27B0", "#9C27B0"),
+            ("🔍", "Searching", "search_label", "#666666", "#666666")
+        ]:
+            col = ctk.CTkFrame(sec_row2, fg_color="transparent")
+            col.pack(side="left", expand=True, padx=10)
+            
+            mini_canvas = ctk.CTkCanvas(col, bg="#0a0a0a", highlightthickness=0, height=25, width=50)
+            mini_canvas.pack()
+            for i in range(8):
+                x = i * 6
+                y = 20 - (i % 2) * 6
+                mini_canvas.create_line(x, 20, x, y, fill=chart_color, width=2)
+            
+            lbl = ctk.CTkLabel(col, text="0", font=("Roboto", 12, "bold"), text_color=color)
+            lbl.pack()
+            setattr(self, var_name, lbl)
+            ctk.CTkLabel(col, text=label, font=("Roboto", 7), text_color="#666666").pack()
+        
+        # Router info bar
+        router_bar = ctk.CTkFrame(parent, fg_color="#1a1a1a", corner_radius=8, height=35, border_width=1, border_color="#2a2a2a")
+        router_bar.pack(fill="x", pady=(0, 15))
+        router_bar.pack_propagate(False)
+        
+        router_content = ctk.CTkFrame(router_bar, fg_color="transparent")
+        router_content.pack(fill="both", expand=True, padx=15, pady=5)
+        
+        ctk.CTkLabel(router_content, text="ROUTER", font=("Roboto", 9), text_color="#666666").pack(side="left", padx=(0, 20))
+        ctk.CTkLabel(router_content, text="⚠ FW Ver: 4.4.5 JRC4", font=("Roboto", 8), text_color="#FF9800").pack(side="left", padx=20)
+        ctk.CTkLabel(router_content, text="⏱ Uptime: 23d 20h 56m", font=("Roboto", 8), text_color="#4CAF50").pack(side="left", padx=20)
+        
+        # Main graphs row - 3 gradient area charts
+        graphs_row = ctk.CTkFrame(parent, fg_color="transparent")
+        graphs_row.pack(fill="both", expand=True, pady=(0, 15))
+        
+        # WAN Throughput
+        wan_graph_card = ctk.CTkFrame(graphs_row, fg_color="#1a1a1a", corner_radius=8, border_width=1, border_color="#2a2a2a")
+        wan_graph_card.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        
+        ctk.CTkLabel(wan_graph_card, text="WAN Throughput", font=("Roboto", 10), text_color="#888888").pack(pady=(10, 5))
+        self.bandwidth_graph = ctk.CTkCanvas(wan_graph_card, bg="#0a0a0a", highlightthickness=0, height=180)
+        self.bandwidth_graph.pack(fill="both", expand=True, padx=10, pady=(0, 5))
+        
+        legend_wan = ctk.CTkFrame(wan_graph_card, fg_color="transparent")
+        legend_wan.pack(pady=(0, 8))
+        ctk.CTkLabel(legend_wan, text="● IN: 0 Mbps", font=("Roboto", 7), text_color="#4CAF50").pack(side="left", padx=5)
+        ctk.CTkLabel(legend_wan, text="● OUT: 0 Mbps", font=("Roboto", 7), text_color="#2196F3").pack(side="left", padx=5)
+        
+        # Packets/sec
+        pkt_graph_card = ctk.CTkFrame(graphs_row, fg_color="#1a1a1a", corner_radius=8, border_width=1, border_color="#2a2a2a")
+        pkt_graph_card.pack(side="left", fill="both", expand=True, padx=10)
+        
+        ctk.CTkLabel(pkt_graph_card, text="Packets Throughput", font=("Roboto", 10), text_color="#888888").pack(pady=(10, 5))
+        self.packets_graph = ctk.CTkCanvas(pkt_graph_card, bg="#0a0a0a", highlightthickness=0, height=180)
+        self.packets_graph.pack(fill="both", expand=True, padx=10, pady=(0, 5))
+        
+        legend_pkt = ctk.CTkFrame(pkt_graph_card, fg_color="transparent")
+        legend_pkt.pack(pady=(0, 8))
+        ctk.CTkLabel(legend_pkt, text="● IN: 0 Mbps", font=("Roboto", 7), text_color="#FFC107").pack(side="left", padx=5)
+        ctk.CTkLabel(legend_pkt, text="● OUT: 0 Mbps", font=("Roboto", 7), text_color="#FF9800").pack(side="left", padx=5)
+        
+        # WAN Latency
+        lat_graph_card = ctk.CTkFrame(graphs_row, fg_color="#1a1a1a", corner_radius=8, border_width=1, border_color="#2a2a2a")
+        lat_graph_card.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        
+        ctk.CTkLabel(lat_graph_card, text="WAN Latency", font=("Roboto", 10), text_color="#888888").pack(pady=(10, 5))
+        self.threats_graph = ctk.CTkCanvas(lat_graph_card, bg="#0a0a0a", highlightthickness=0, height=180)
+        self.threats_graph.pack(fill="both", expand=True, padx=10, pady=(0, 5))
+        
+        legend_lat = ctk.CTkFrame(lat_graph_card, fg_color="transparent")
+        legend_lat.pack(pady=(0, 8))
+        ctk.CTkLabel(legend_lat, text="● LATENCY: 0 ms", font=("Roboto", 7), text_color="#F44336").pack(side="left", padx=5)
+        
+        # Bottom stats grid - 4 compact panels
+        bottom_row = ctk.CTkFrame(parent, fg_color="transparent")
+        bottom_row.pack(fill="x")
+        
+        # Network Traffic panel
+        net_card = ctk.CTkFrame(bottom_row, fg_color="#1a1a1a", corner_radius=8, border_width=1, border_color="#2a2a2a")
+        net_card.pack(side="left", fill="both", expand=True, padx=(0, 10))
+        
+        ctk.CTkLabel(net_card, text="NETWORK", font=("Roboto", 9), text_color="#666666").pack(pady=(8, 5), padx=10, anchor="w")
+        net_grid = ctk.CTkFrame(net_card, fg_color="transparent")
+        net_grid.pack(padx=10, pady=(0, 8))
+        
+        for i, (label, var_name, color) in enumerate([
+            ("TCP", "tcp_label", "#2196F3"),
+            ("UDP", "udp_label", "#FFC107"),
+            ("ICMP", "icmp_label", "#F44336")
+        ]):
+            col = ctk.CTkFrame(net_grid, fg_color="transparent")
+            col.grid(row=0, column=i, padx=8)
+            lbl = ctk.CTkLabel(col, text="0", font=("Roboto", 16, "bold"), text_color=color)
+            lbl.pack()
+            setattr(self, var_name, lbl)
+            ctk.CTkLabel(col, text=label, font=("Roboto", 7), text_color="#666666").pack()
+        
+        # Protocols panel
+        proto_card = ctk.CTkFrame(bottom_row, fg_color="#1a1a1a", corner_radius=8, border_width=1, border_color="#2a2a2a")
+        proto_card.pack(side="left", fill="both", expand=True, padx=10)
+        
+        ctk.CTkLabel(proto_card, text="PROTOCOLS", font=("Roboto", 9), text_color="#666666").pack(pady=(8, 5), padx=10, anchor="w")
+        proto_grid = ctk.CTkFrame(proto_card, fg_color="transparent")
+        proto_grid.pack(padx=10, pady=(0, 8))
+        
+        for i, (label, var_name, color) in enumerate([
+            ("HTTP", "http_label", "#4CAF50"),
+            ("HTTPS", "https_label", "#2196F3"),
+            ("DNS", "dns_label", "#9C27B0")
+        ]):
+            col = ctk.CTkFrame(proto_grid, fg_color="transparent")
+            col.grid(row=0, column=i, padx=8)
+            lbl = ctk.CTkLabel(col, text="0", font=("Roboto", 16, "bold"), text_color=color)
+            lbl.pack()
+            setattr(self, var_name, lbl)
+            ctk.CTkLabel(col, text=label, font=("Roboto", 7), text_color="#666666").pack()
+        
+        # Live Stats panel
+        stats_card = ctk.CTkFrame(bottom_row, fg_color="#1a1a1a", corner_radius=8, border_width=1, border_color="#2a2a2a")
+        stats_card.pack(side="left", fill="both", expand=True, padx=10)
+        
+        ctk.CTkLabel(stats_card, text="LIVE STATS", font=("Roboto", 9), text_color="#666666").pack(pady=(8, 5), padx=10, anchor="w")
+        stats_grid = ctk.CTkFrame(stats_card, fg_color="transparent")
+        stats_grid.pack(padx=10, pady=(0, 8))
+        
+        for i, (label, var_name, color) in enumerate([
+            ("Packets", "total_packets_label", "#00BCD4"),
+            ("Pkt/s", "pps_label", "#FFC107"),
+            ("Mbps", "bandwidth_label", "#4CAF50")
+        ]):
+            col = ctk.CTkFrame(stats_grid, fg_color="transparent")
+            col.grid(row=0, column=i, padx=8)
+            lbl = ctk.CTkLabel(col, text="0", font=("Roboto", 16, "bold"), text_color=color)
+            lbl.pack()
+            setattr(self, var_name, lbl)
+            ctk.CTkLabel(col, text=label, font=("Roboto", 7), text_color="#666666").pack()
+        
+        # Threats panel
+        threat_card = ctk.CTkFrame(bottom_row, fg_color="#1a1a1a", corner_radius=8, border_width=1, border_color="#2a2a2a")
+        threat_card.pack(side="left", fill="both", expand=True, padx=(10, 0))
+        
+        ctk.CTkLabel(threat_card, text="THREATS", font=("Roboto", 9), text_color="#666666").pack(pady=(8, 5), padx=10, anchor="w")
+        threat_grid = ctk.CTkFrame(threat_card, fg_color="transparent")
+        threat_grid.pack(padx=10, pady=(0, 8))
+        
+        for i, (label, var_name, color) in enumerate([
+            ("High", "high_threats_label", "#F44336"),
+            ("Med", "medium_threats_label", "#FF9800"),
+            ("Low", "low_threats_label", "#FFC107")
+        ]):
+            col = ctk.CTkFrame(threat_grid, fg_color="transparent")
+            col.grid(row=0, column=i, padx=8)
+            lbl = ctk.CTkLabel(col, text="0", font=("Roboto", 16, "bold"), text_color=color)
+            lbl.pack()
+            setattr(self, var_name, lbl)
+            ctk.CTkLabel(col, text=label, font=("Roboto", 7), text_color="#666666").pack()
+        
+        # Set remaining labels for compatibility
+        self.total_threats_label = self.high_threats_label
+        self.bytes_label = ctk.CTkLabel(parent, text="0 B")  # Hidden placeholder
+        self.ips_label = ctk.CTkLabel(parent, text="0")  # Hidden placeholder
+        self.connections_label = ctk.CTkLabel(parent, text="0")  # Hidden placeholder
+        self.ports_label = ctk.CTkLabel(parent, text="0")  # Hidden placeholder
+    
+    def _create_packets_content(self, parent):
+        """Create live packets view"""
+        # Title
+        title_frame = ctk.CTkFrame(parent, fg_color="#1a1a1a", height=60, corner_radius=8, border_width=1, border_color="#2a2a2a")
+        title_frame.pack(fill="x", pady=(0, 10))
+        title_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="📦 LIVE PACKET CAPTURE",
+            font=("Roboto", 20, "bold"),
+            text_color="#4CAF50"
+        ).pack(pady=15)
+        
+        # Stats bar
+        stats_frame = ctk.CTkFrame(parent, fg_color="#1a1a1a", height=80, corner_radius=8, border_width=1, border_color="#2a2a2a")
+        stats_frame.pack(fill="x", pady=(0, 10))
+        stats_frame.pack_propagate(False)
+        
+        stats_container = ctk.CTkFrame(stats_frame, fg_color="transparent")
+        stats_container.pack(expand=True)
+        
+        # Packet stats
+        col1 = ctk.CTkFrame(stats_container, fg_color="transparent")
+        col1.pack(side="left", padx=30)
+        self.packets_total_label = self._create_metric_card(col1, "📦", "Total", "0", "#4CAF50")
+        
+        col2 = ctk.CTkFrame(stats_container, fg_color="transparent")
+        col2.pack(side="left", padx=30)
+        self.packets_rate_label = self._create_metric_card(col2, "⚡", "Rate/sec", "0", "#2196F3")
+        
+        col3 = ctk.CTkFrame(stats_container, fg_color="transparent")
+        col3.pack(side="left", padx=30)
+        self.packets_tcp_label = self._create_metric_card(col3, "🔷", "TCP", "0", "#FFC107")
+        
+        col4 = ctk.CTkFrame(stats_container, fg_color="transparent")
+        col4.pack(side="left", padx=30)
+        self.packets_udp_label = self._create_metric_card(col4, "🔶", "UDP", "0", "#F44336")
+        
+        # Packet list with header
+        list_frame = ctk.CTkFrame(parent, fg_color="#1a1a1a", border_width=1, border_color="#2a2a2a", corner_radius=8)
+        list_frame.pack(fill="both", expand=True)
+        
+        # Header
+        header = ctk.CTkFrame(list_frame, fg_color="#0f0f0f", height=35, corner_radius=0)
+        header.pack(fill="x", padx=5, pady=5)
+        header.pack_propagate(False)
+        
+        ctk.CTkLabel(header, text="No.", font=("Roboto", 10, "bold"), text_color="#888888", width=60, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Time", font=("Roboto", 10, "bold"), text_color="#888888", width=80, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Protocol", font=("Roboto", 10, "bold"), text_color="#888888", width=80, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Source", font=("Roboto", 10, "bold"), text_color="#888888", width=200, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Destination", font=("Roboto", 10, "bold"), text_color="#888888", width=200, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Length", font=("Roboto", 10, "bold"), text_color="#888888", width=80, anchor="w").pack(side="left", padx=5)
+        
+        # Scrollable packet list
+        self.packets_text = scrolledtext.ScrolledText(
+            list_frame,
+            bg="#0a0a0a",
+            fg="#4CAF50",
+            font=("Courier New", 9),
+            insertbackground="#4CAF50",
+            wrap="none"
+        )
+        self.packets_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+        self.packets_text.insert("1.0", "Waiting for packet capture to start...\n")
+    
+    def _create_threats_content(self, parent):
+        """Create threat detection view"""
+        # Title
+        title_frame = ctk.CTkFrame(parent, fg_color="#1a1a1a", height=60, corner_radius=8, border_width=1, border_color="#2a2a2a")
+        title_frame.pack(fill="x", pady=(0, 10))
+        title_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="⚠️ THREAT DETECTION & ANALYSIS",
+            font=("Roboto", 20, "bold"),
+            text_color="#F44336"
+        ).pack(pady=15)
+        
+        # Threat stats
+        stats_frame = ctk.CTkFrame(parent, fg_color="#1a1a1a", height=80, corner_radius=8, border_width=1, border_color="#2a2a2a")
+        stats_frame.pack(fill="x", pady=(0, 10))
+        stats_frame.pack_propagate(False)
+        
+        stats_container = ctk.CTkFrame(stats_frame, fg_color="transparent")
+        stats_container.pack(expand=True)
+        
+        col1 = ctk.CTkFrame(stats_container, fg_color="transparent")
+        col1.pack(side="left", padx=30)
+        self.threats_total_label = self._create_metric_card(col1, "⚠️", "Total", "0", "#F44336")
+        
+        col2 = ctk.CTkFrame(stats_container, fg_color="transparent")
+        col2.pack(side="left", padx=30)
+        self.threats_high_label = self._create_metric_card(col2, "🔴", "High", "0", "#ff0000")
+        
+        col3 = ctk.CTkFrame(stats_container, fg_color="transparent")
+        col3.pack(side="left", padx=30)
+        self.threats_medium_label = self._create_metric_card(col3, "🟠", "Medium", "0", "#FF9800")
+        
+        col4 = ctk.CTkFrame(stats_container, fg_color="transparent")
+        col4.pack(side="left", padx=30)
+        self.threats_low_label = self._create_metric_card(col4, "🟡", "Low", "0", "#FFC107")
+        
+        # Threats list
+        list_frame = ctk.CTkFrame(parent, fg_color="#1a1a1a", border_width=1, border_color="#2a2a2a", corner_radius=8)
+        list_frame.pack(fill="both", expand=True)
+        
+        # Header
+        header = ctk.CTkFrame(list_frame, fg_color="#0f0f0f", height=35, corner_radius=0)
+        header.pack(fill="x", padx=5, pady=5)
+        header.pack_propagate(False)
+        
+        ctk.CTkLabel(header, text="Time", font=("Roboto", 10, "bold"), text_color="#888888", width=80, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Severity", font=("Roboto", 10, "bold"), text_color="#888888", width=80, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Type", font=("Roboto", 10, "bold"), text_color="#888888", width=150, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Description", font=("Roboto", 10, "bold"), text_color="#888888", anchor="w").pack(side="left", padx=5, fill="x", expand=True)
+        
+        self.threats_text = scrolledtext.ScrolledText(
+            list_frame,
+            bg="#0a0a0a",
+            fg="#F44336",
+            font=("Courier New", 9),
+            insertbackground="#F44336",
+            wrap="word"
+        )
+        self.threats_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+        self.threats_text.insert("1.0", "Threat detection ready. Waiting for monitoring to start...\n")
+    
+    def _create_ports_content(self, parent):
+        """Create active ports view"""
+        # Title
+        title_frame = ctk.CTkFrame(parent, fg_color="#1a1a1a", height=60, corner_radius=8, border_width=1, border_color="#2a2a2a")
+        title_frame.pack(fill="x", pady=(0, 10))
+        title_frame.pack_propagate(False)
+        
+        ctk.CTkLabel(
+            title_frame,
+            text="🔌 ACTIVE PORTS MONITORING",
+            font=("Roboto", 20, "bold"),
+            text_color="#FFC107"
+        ).pack(pady=15)
+        
+        # Port stats
+        stats_frame = ctk.CTkFrame(parent, fg_color="#1a1a1a", height=80, corner_radius=8, border_width=1, border_color="#2a2a2a")
+        stats_frame.pack(fill="x", pady=(0, 10))
+        stats_frame.pack_propagate(False)
+        
+        stats_container = ctk.CTkFrame(stats_frame, fg_color="transparent")
+        stats_container.pack(expand=True)
+        
+        col1 = ctk.CTkFrame(stats_container, fg_color="transparent")
+        col1.pack(side="left", padx=30)
+        self.ports_unique_label = self._create_metric_card(col1, "🔌", "Unique", "0", "#FFC107")
+        
+        col2 = ctk.CTkFrame(stats_container, fg_color="transparent")
+        col2.pack(side="left", padx=30)
+        self.ports_connections_label = self._create_metric_card(col2, "🔗", "Connections", "0", "#2196F3")
+        
+        col3 = ctk.CTkFrame(stats_container, fg_color="transparent")
+        col3.pack(side="left", padx=30)
+        self.ports_services_label = self._create_metric_card(col3, "⚙️", "Services", "0", "#4CAF50")
+        
+        # Ports list
+        list_frame = ctk.CTkFrame(parent, fg_color="#1a1a1a", border_width=1, border_color="#2a2a2a", corner_radius=8)
+        list_frame.pack(fill="both", expand=True)
+        
+        # Header
+        header = ctk.CTkFrame(list_frame, fg_color="#0f0f0f", height=35, corner_radius=0)
+        header.pack(fill="x", padx=5, pady=5)
+        header.pack_propagate(False)
+        
+        ctk.CTkLabel(header, text="Port", font=("Roboto", 10, "bold"), text_color="#888888", width=80, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Service", font=("Roboto", 10, "bold"), text_color="#888888", width=150, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Protocol", font=("Roboto", 10, "bold"), text_color="#888888", width=100, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Packets", font=("Roboto", 10, "bold"), text_color="#888888", width=100, anchor="w").pack(side="left", padx=5)
+        ctk.CTkLabel(header, text="Status", font=("Roboto", 10, "bold"), text_color="#888888", anchor="w").pack(side="left", padx=5, fill="x", expand=True)
+        
+        self.ports_text = scrolledtext.ScrolledText(
+            list_frame,
+            bg="#0a0a0a",
+            fg="#FFC107",
+            font=("Courier New", 9),
+            insertbackground="#FFC107",
+            wrap="none"
+        )
+        self.ports_text.pack(fill="both", expand=True, padx=5, pady=(0, 5))
+        self.ports_text.insert("1.0", "Port monitoring ready. Waiting for monitoring to start...\n")
     
     def _on_interface_change(self, choice):
         """Handle interface selection change"""
@@ -442,10 +973,10 @@ class CyberSafeGUI:
         frame = ctk.CTkFrame(parent, fg_color="transparent")
         frame.pack()
         
-        ctk.CTkLabel(frame, text=icon, font=("Arial", 24)).pack()
-        ctk.CTkLabel(frame, text=label, font=("Arial", 9), text_color="#888").pack()
+        ctk.CTkLabel(frame, text=icon, font=("Segoe UI Emoji", 20)).pack()
+        ctk.CTkLabel(frame, text=label, font=("Roboto", 8), text_color="#666666").pack()
         
-        value_label = ctk.CTkLabel(frame, text=value, font=("Arial", 16, "bold"), text_color=color)
+        value_label = ctk.CTkLabel(frame, text=value, font=("Roboto", 14, "bold"), text_color=color)
         value_label.pack()
         
         return value_label
@@ -534,8 +1065,8 @@ class CyberSafeGUI:
             
             # Update UI
             self.monitoring_active = True
-            self.capture_btn.configure(text="⏹ Stop Capture", fg_color="#ff6b6b")
-            self.status_label.configure(text="🔴 LIVE MONITORING", text_color="#ff6b6b")
+            self.capture_btn.configure(text="⏹ Stop Capture", fg_color="#F44336", hover_color="#E53935")
+            self.status_label.configure(text="🔴 LIVE MONITORING", text_color="#F44336")
             self.interface_menu.configure(state="disabled")
             
             # Clear previous data
@@ -576,8 +1107,8 @@ class CyberSafeGUI:
                 )
             
             self.monitoring_active = False
-            self.capture_btn.configure(text="▶ Start Capture", fg_color="#00d4ff")
-            self.status_label.configure(text="🟡 Ready to Monitor", text_color="#ffd93d")
+            self.capture_btn.configure(text="▶ Start Capture", fg_color="#4CAF50", hover_color="#66BB6A")
+            self.status_label.configure(text="🟡 Ready to Monitor", text_color="#FFC107")
             self.interface_menu.configure(state="normal")
             
         except Exception as e:
@@ -782,18 +1313,41 @@ class CyberSafeGUI:
             self.medium_threats_label.configure(text=str(self.metrics['medium_threats']))
             self.low_threats_label.configure(text=str(self.metrics['low_threats']))
             
+            # Update separate view stats
+            self.threats_total_label.configure(text=str(self.metrics['total_threats']))
+            self.threats_high_label.configure(text=str(self.metrics['high_threats']))
+            self.threats_medium_label.configure(text=str(self.metrics['medium_threats']))
+            self.threats_low_label.configure(text=str(self.metrics['low_threats']))
+            
+            # Packets view stats
+            self.packets_total_label.configure(text=f"{self.metrics['total_packets']:,}")
+            self.packets_rate_label.configure(text=f"{self.metrics['packets_per_sec']:.1f}")
+            self.packets_tcp_label.configure(text=f"{self.metrics['tcp_packets']:,}")
+            self.packets_udp_label.configure(text=f"{self.metrics['udp_packets']:,}")
+            
+            # Ports view stats
+            self.ports_unique_label.configure(text=str(len(self.metrics['unique_ports'])))
+            self.ports_connections_label.configure(text=f"{self.metrics['total_packets']:,}")
+            
+            # Count known services
+            known_services = sum(1 for port in self.ports_dict.keys() if port in [20,21,22,23,25,53,80,110,143,443,445,3306,3389,5432,8080])
+            self.ports_services_label.configure(text=str(known_services))
+            
             # Protocols
             self.dns_label.configure(text=f"{self.metrics['dns_packets']:,}")
             
-            # Update ports display
+            # Update ports display in ports view
             if len(self.ports_dict) > 0:
                 self.ports_text.delete("1.0", "end")
-                self.ports_text.insert("1.0", f"Active Ports (Top 20 by packet count):\n{'='*60}\n\n")
                 
-                sorted_ports = sorted(self.ports_dict.items(), key=lambda x: x[1], reverse=True)[:20]
+                sorted_ports = sorted(self.ports_dict.items(), key=lambda x: x[1], reverse=True)[:30]
                 for port, count in sorted_ports:
                     port_name = self._get_port_name(port)
-                    self.ports_text.insert("end", f"Port {port:5d} ({port_name:15s}): {count:6d} packets\n")
+                    protocol = "TCP/UDP"
+                    status = "Active" if count > 10 else "Monitored"
+                    
+                    line = f"{port:<8d} {port_name:<18s} {protocol:<12s} {count:>8d}    {status}\n"
+                    self.ports_text.insert("end", line)
             
             # Update graphs
             self._draw_graph(self.bandwidth_graph, self.bandwidth_history, "#00d4ff")
@@ -814,7 +1368,7 @@ class CyberSafeGUI:
         return port_names.get(port, "Unknown")
     
     def _draw_graph(self, canvas, data, color):
-        """Draw live graph on canvas"""
+        """Draw professional gradient-filled area chart"""
         try:
             canvas.delete("all")
             
@@ -830,79 +1384,231 @@ class CyberSafeGUI:
             # Get max value for scaling
             max_val = max(data) if max(data) > 0 else 1
             
-            # Draw grid lines
+            # Draw background grid lines
             for i in range(5):
                 y = height * i / 4
-                canvas.create_line(0, y, width, y, fill="#1a2744", width=1)
+                canvas.create_line(0, y, width, y, fill="#1a1a1a", width=1)
             
-            # Draw data
+            for i in range(6):
+                x = width * i / 5
+                canvas.create_line(x, 0, x, height, fill="#1a1a1a", width=1)
+            
+            # Create gradient area fill
+            step = width / max(len(data) - 1, 1)
+            
+            # Build polygon points for filled area
             points = []
-            step = width / len(data)
             
+            # Start from bottom-left
+            points.append(0)
+            points.append(height)
+            
+            # Add data points
             for i, value in enumerate(data):
                 x = i * step
-                y = height - (value / max_val * height * 0.9) - (height * 0.05)
-                points.extend([x, y])
+                y = height - (value / max_val * height * 0.85) - (height * 0.1)
+                points.append(x)
+                points.append(y)
             
-            if len(points) >= 4:
-                canvas.create_line(points, fill=color, width=2, smooth=True)
+            # Close polygon at bottom-right
+            points.append((len(data) - 1) * step)
+            points.append(height)
+            
+            # Draw filled polygon with gradient effect (simulate with transparency)
+            if len(points) >= 6:
+                # Dark fill at bottom
+                canvas.create_polygon(points, fill=color, stipple="gray25", outline="")
+                
+                # Brighter fill in middle
+                mid_points = points[:-2]  # Remove last bottom point
+                canvas.create_polygon(mid_points, fill=color, stipple="gray50", outline="")
+            
+            # Draw top line (bright)
+            line_points = []
+            for i, value in enumerate(data):
+                x = i * step
+                y = height - (value / max_val * height * 0.85) - (height * 0.1)
+                line_points.extend([x, y])
+            
+            if len(line_points) >= 4:
+                canvas.create_line(line_points, fill=color, width=2, smooth=True)
             
             # Draw current value
             if len(data) > 0:
                 current = data[-1]
                 canvas.create_text(
-                    width - 10, 10,
+                    width - 10, 15,
                     text=f"{current:.1f}",
                     fill=color,
-                    font=("Arial", 10, "bold"),
+                    font=("Roboto", 11, "bold"),
                     anchor="ne"
                 )
+                
+            # Draw min/max labels
+            canvas.create_text(
+                5, 10,
+                text=f"{max_val:.1f}",
+                fill="#666666",
+                font=("Roboto", 8),
+                anchor="nw"
+            )
+            canvas.create_text(
+                5, height - 10,
+                text="0.0",
+                fill="#666666",
+                font=("Roboto", 8),
+                anchor="sw"
+            )
+            
         except Exception as e:
             print(f"Error drawing graph: {e}")
     
     def _export_dialog(self):
-        """Export dialog"""
+        """Export dialog - Professional style"""
         dialog = ctk.CTkToplevel(self.root)
         dialog.title("Export Report")
-        dialog.geometry("350x300")
+        dialog.geometry("400x450")
+        dialog.configure(fg_color="#1a1a1a")
         dialog.transient(self.root)
         dialog.grab_set()
         
-        ctk.CTkLabel(dialog, text="Export Live Data", font=("Arial", 12, "bold"), text_color="#00d4ff").pack(pady=15)
+        # Title
+        title_frame = ctk.CTkFrame(dialog, fg_color="#0a0a0a", height=50)
+        title_frame.pack(fill="x")
+        title_frame.pack_propagate(False)
         
-        # Format
-        ctk.CTkLabel(dialog, text="Format:", font=("Arial", 10)).pack(anchor="w", padx=20)
+        ctk.CTkLabel(
+            title_frame, 
+            text="Export Live Data", 
+            font=("Roboto", 16, "bold"), 
+            text_color="#2196F3"
+        ).pack(pady=15)
+        
+        content = ctk.CTkFrame(dialog, fg_color="#1a1a1a")
+        content.pack(fill="both", expand=True, padx=20, pady=20)
+        
+        # Format Section
+        format_label = ctk.CTkLabel(
+            content, 
+            text="Format:", 
+            font=("Roboto", 11, "bold"), 
+            text_color="#ffffff",
+            anchor="w"
+        )
+        format_label.pack(anchor="w", pady=(0, 10))
+        
         fmt_var = ctk.StringVar(value="JSON")
-        for label, val in [("📄 JSON", "JSON"), ("📕 PDF", "PDF"), ("📘 Word", "WORD"), ("📋 Text", "TEXT")]:
-            ctk.CTkRadioButton(dialog, text=label, variable=fmt_var, value=val).pack(anchor="w", padx=40)
         
-        # Location
-        ctk.CTkLabel(dialog, text="Location:", font=("Arial", 10)).pack(anchor="w", padx=20, pady=(15, 0))
+        format_options = [
+            ("📄  JSON", "JSON", "#2196F3"),
+            ("📕  PDF", "PDF", "#F44336"),
+            ("📘  Word", "WORD", "#4CAF50"),
+            ("📋  Text", "TEXT", "#FFC107")
+        ]
+        
+        for label, val, color in format_options:
+            radio = ctk.CTkRadioButton(
+                content,
+                text=label,
+                variable=fmt_var,
+                value=val,
+                font=("Roboto", 11),
+                text_color="#cccccc",
+                fg_color=color,
+                hover_color=color,
+                border_width_checked=6,
+                border_width_unchecked=2
+            )
+            radio.pack(anchor="w", padx=10, pady=5)
+        
+        # Separator
+        ctk.CTkFrame(content, fg_color="#333333", height=1).pack(fill="x", pady=15)
+        
+        # Location Section
+        location_label = ctk.CTkLabel(
+            content, 
+            text="Location:", 
+            font=("Roboto", 11, "bold"), 
+            text_color="#ffffff",
+            anchor="w"
+        )
+        location_label.pack(anchor="w", pady=(0, 10))
+        
         loc_var = ctk.StringVar(value="downloads")
-        for label, val in [("📁 Downloads", "downloads"), ("🖥️ Desktop", "desktop"), ("📂 Documents", "documents"), ("📌 Custom", "custom")]:
-            ctk.CTkRadioButton(dialog, text=label, variable=loc_var, value=val).pack(anchor="w", padx=40)
+        
+        location_options = [
+            ("📁  Downloads", "downloads"),
+            ("🖥️  Desktop", "desktop"),
+            ("📂  Documents", "documents"),
+            ("📌  Custom", "custom")
+        ]
+        
+        for label, val in location_options:
+            radio = ctk.CTkRadioButton(
+                content,
+                text=label,
+                variable=loc_var,
+                value=val,
+                font=("Roboto", 11),
+                text_color="#cccccc",
+                fg_color="#2196F3",
+                hover_color="#42A5F5",
+                border_width_checked=6,
+                border_width_unchecked=2
+            )
+            radio.pack(anchor="w", padx=10, pady=5)
+        
+        # Buttons
+        btn_frame = ctk.CTkFrame(dialog, fg_color="#0a0a0a", height=60)
+        btn_frame.pack(fill="x", side="bottom")
+        btn_frame.pack_propagate(False)
+        
+        btn_container = ctk.CTkFrame(btn_frame, fg_color="transparent")
+        btn_container.pack(expand=True)
         
         def export():
             fmt = fmt_var.get()
             loc = loc_var.get()
             
             if loc == "custom":
-                loc = filedialog.askdirectory()
-                if not loc:
+                custom_loc = filedialog.askdirectory(title="Select Export Location")
+                if not custom_loc:
                     return
+                loc = custom_loc
             else:
-                paths = {"downloads": os.path.expanduser("~/Downloads"), 
-                        "desktop": os.path.expanduser("~/Desktop"), 
-                        "documents": os.path.expanduser("~/Documents")}
+                paths = {
+                    "downloads": os.path.expanduser("~/Downloads"), 
+                    "desktop": os.path.expanduser("~/Desktop"), 
+                    "documents": os.path.expanduser("~/Documents")
+                }
                 loc = paths[loc]
             
             self._perform_export(fmt, loc)
             dialog.destroy()
         
-        btn = ctk.CTkFrame(dialog, fg_color="transparent")
-        btn.pack(pady=15)
-        ctk.CTkButton(btn, text="Export", command=export, fg_color="#00d4ff", width=120).pack(side="left", padx=5)
-        ctk.CTkButton(btn, text="Cancel", command=dialog.destroy, fg_color="#666", width=120).pack(side="left", padx=5)
+        ctk.CTkButton(
+            btn_container,
+            text="Export",
+            command=export,
+            fg_color="#4CAF50",
+            hover_color="#66BB6A",
+            width=140,
+            height=40,
+            font=("Roboto", 12, "bold"),
+            corner_radius=6
+        ).pack(side="left", padx=5)
+        
+        ctk.CTkButton(
+            btn_container,
+            text="Cancel",
+            command=dialog.destroy,
+            fg_color="#666666",
+            hover_color="#888888",
+            width=140,
+            height=40,
+            font=("Roboto", 12, "bold"),
+            corner_radius=6
+        ).pack(side="left", padx=5)
     
     def _perform_export(self, fmt, loc):
         """Export live data report"""
