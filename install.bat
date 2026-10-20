@@ -107,6 +107,13 @@ REM STEP 4: Create desktop shortcut
 REM ============================================================================
 echo [STEP 4/5] Creating desktop shortcut...
 
+REM Ensure assets directory exists
+if not exist "%~dp0assets" mkdir "%~dp0assets"
+
+REM Set icon path - use .ico if present, fallback to START.bat icon
+set ICON_PATH=%~dp0assets\cybersafe_logo.ico
+if not exist "%ICON_PATH%" set ICON_PATH=%~dp0START.bat,0
+
 REM Create VBScript to generate shortcut
 set SCRIPT="%TEMP%\create_shortcut.vbs"
 echo Set oWS = WScript.CreateObject("WScript.Shell") > %SCRIPT%
@@ -115,13 +122,13 @@ echo Set oLink = oWS.CreateShortcut(sLinkFile) >> %SCRIPT%
 echo oLink.TargetPath = "%~dp0START.bat" >> %SCRIPT%
 echo oLink.WorkingDirectory = "%~dp0" >> %SCRIPT%
 echo oLink.Description = "CyberSafe Network Traffic Monitoring and Threat Detection" >> %SCRIPT%
-echo oLink.IconLocation = "%~dp0assets\cybersafe_logo.ico" >> %SCRIPT%
+echo oLink.IconLocation = "%ICON_PATH%" >> %SCRIPT%
 echo oLink.Save >> %SCRIPT%
 
 cscript //nologo %SCRIPT%
 del %SCRIPT%
 
-echo [OK] Desktop shortcut created
+echo [OK] Desktop shortcut created with CyberSafe icon
 echo.
 
 REM ============================================================================
