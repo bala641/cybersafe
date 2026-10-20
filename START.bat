@@ -4,9 +4,17 @@ REM Launches CyberSafe GUI without visible console window
 
 cd /d "%~dp0"
 
-REM Run Python in background using pythonw (no console)
-start /B pythonw main.py --gui
+REM Check if Python is available
+python --version >nul 2>&1
+if %errorLevel% neq 0 (
+    echo Python not found! Please run install.bat first.
+    pause
+    exit /b 1
+)
 
-REM Alternative: Use VBS launcher for completely hidden launch
-REM wscript launcher.vbs
+REM Run Python in background using pythonw (no console)
+start /B pythonw "%~dp0src\main.py" --gui
+
+REM Exit immediately
+exit
 
