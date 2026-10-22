@@ -1,40 +1,37 @@
 # ============================================================================
-# CyberSafe Network Monitor - Complete Dependencies
+# CyberSafe Network Monitor - Dependencies
+# Compatible: Python 3.9 - 3.13
 # ============================================================================
 
 # Core Network Analysis
-scapy==2.5.0
-psutil==5.9.6
+scapy>=2.5.0
+psutil>=5.9.6
 
-# Web Framework & Real-time Communication
-flask==3.0.0
-flask-socketio==5.3.5
-flask-cors==4.0.0
-python-socketio==5.10.0
+# Web Framework
+flask>=3.0.0
+flask-socketio>=5.3.5
+flask-cors>=4.0.0
+python-socketio>=5.10.0
 
-# Database & Storage
-sqlalchemy==2.0.23
+# Database
+sqlalchemy>=2.0.23
 
-# Threat Detection & Analysis
-pytz==2023.3
-python-dateutil==2.8.2
-geoip2==4.7.0
+# Utilities
+pytz>=2023.3
+python-dateutil>=2.8.2
+geoip2>=4.7.0
+colorama>=0.4.6
+pyyaml>=6.0.1
+requests>=2.31.0
 
-# Desktop GUI & Graphics
-customtkinter==5.2.1
-pillow==10.1.0
-matplotlib==3.8.0
-numpy==1.24.3
+# Desktop GUI & Graphics (Python 3.13 compatible versions)
+customtkinter>=5.2.2
+pillow>=10.4.0
+matplotlib>=3.9.0
+numpy>=2.0.0
 
-# Report Generation & Export
-reportlab==4.0.9
-python-docx==0.8.11
+# Report Generation
+reportlab>=4.0.9
+python-docx>=0.8.11
 
-# Utilities & Helpers
-colorama==0.4.6
-pyyaml==6.0.1
-requests==2.31.0
-
-# ============================================================================
-# Installation: pip install -r requirements.txt
 # ============================================================================
